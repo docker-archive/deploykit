@@ -98,6 +98,10 @@ var (
 	TopicCollectionGone = types.PathFromString("collection/gone")
 )
 
+func (c *Collection) topic(p types.Path) types.Path {
+	return types.PathFromString(c.Spec.Metadata.Name).Join(p)
+}
+
 // NewCollection returns a Managed controller object that represents a collection
 // of finite state machines (FSM).
 func NewCollection(scope scope.Scope) (*Collection, error) {
@@ -107,7 +111,7 @@ func NewCollection(scope scope.Scope) (*Collection, error) {
 		metadataUpdates: make(chan func(map[string]interface{})),
 		stop:            make(chan struct{}),
 		topics:          map[string]interface{}{},
-		events:          make(chan *event.Event, 64),
+		events:          make(chan *event.Event),
 	}
 
 	stub := func() interface{} { return "TODO" } // TODO - rationalize this
@@ -154,19 +158,19 @@ func (c *Collection) PublishOn(events chan<- *event.Event) {
 	go func() {
 		for {
 			evt, ok := <-c.events
-
-			log.Debug("Event", "event", evt, "ok", ok, "V", debugV2)
-
 			if !ok {
 				return
 			}
 
-			// non-blocking send
-			select {
-			case events <- evt:
-			default:
-				log.Warn("Event may not be sent", "event", evt)
-			}
+			events <- evt
+			log.Debug("Event", "event", evt, "ok", ok, "V", debugV2)
+
+			// // non-blocking send
+			// select {
+			// case events <- evt:
+			// default:
+			// 	log.Warn("Event may not be sent", "event", evt)
+			// }
 		}
 	}()
 
@@ -198,9 +202,11 @@ func (c *Collection) MetadataGone(key func(instance.Description) (string, error)
 		}
 
 		c.events <- event.Event{
-			Type: c.EventType(),
-			ID:   k,
-		}.Init().Now().WithTopic(TopicMetadataGone.String()).WithDataMust(k)
+			Topic:   c.topic(TopicMetadataGone),
+			Type:    c.EventType(),
+			ID:      k,
+			Message: "metadata gone",
+		}.Init().WithDataMust(k)
 	}
 }
 
@@ -243,9 +249,11 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 
 	for _, d := range v {
 		c.events <- event.Event{
-			Type: c.EventType(),
-			ID:   string(d.ID),
-		}.Init().Now().WithTopic(TopicMetadataUpdate.String()).WithDataMust(d)
+			Topic:   c.topic(TopicMetadataUpdate),
+			Type:    c.EventType(),
+			ID:      string(d.ID),
+			Message: "update metadata",
+		}.Init().WithDataMust(d)
 	}
 
 	return nil
@@ -256,9 +264,11 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 
 	defer func() {
 		c.events <- event.Event{
-			Type: c.EventType(),
-			ID:   string(k),
-		}.Init().Now().WithTopic(TopicCollectionUpdate.String()).WithDataMust(spec.StateName(fsm.State()))
+			Topic:   c.topic(TopicCollectionUpdate),
+			Type:    c.EventType(),
+			ID:      string(k),
+			Message: "update collection",
+		}.Init().WithDataMust(spec.StateName(fsm.State()))
 	}()
 
 	if data == nil {
@@ -302,10 +312,12 @@ func (c *Collection) GetByFSM(f fsm.FSM) (item *Item) {
 // Delete an item by key. This is unsychronized.
 func (c *Collection) Delete(k string) {
 	defer func() {
-		c.events <- event.Event{
-			Type: c.EventType(),
-			ID:   string(k),
-		}.Init().Now().WithTopic(TopicCollectionGone.String())
+		c.events <- &event.Event{
+			Topic:   c.topic(TopicCollectionGone),
+			Type:    c.EventType(),
+			ID:      string(k),
+			Message: "object gone",
+		}
 	}()
 	delete(c.items, k)
 }

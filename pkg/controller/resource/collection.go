@@ -219,7 +219,7 @@ func (c *collection) run(ctx context.Context) {
 					}
 
 					if item := c.Collection.Get(k); item != nil {
-						log.Info("lost", "instance", n, "name", lost.name, "key", k)
+						log.Error("lost", "instance", n, "name", lost.name, "key", k)
 						item.State.Signal(resourceLost)
 					}
 					delete(c.resources, k)
@@ -262,7 +262,7 @@ func (c *collection) run(ctx context.Context) {
 					// Notify watchers if any
 					c.watch.Notify(k)
 
-					log.Info("found", "instance", n, "name", found.name, "key", k)
+					log.Debug("found", "instance", n, "name", found.name, "key", k, "V", debugV2)
 					item.State.Signal(resourceFound)
 					item.Data["instance"] = n
 				}

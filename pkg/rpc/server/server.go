@@ -175,6 +175,9 @@ func startAtPath(listen []string, discoverPath string,
 					if !ok {
 						return
 					}
+					if event.Timestamp.IsZero() {
+						event.Now()
+					}
 					events.Publish(event.Topic.String(), event, 1*time.Second)
 				case <-stop:
 					log.Info("Stopping event relay")

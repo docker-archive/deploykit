@@ -60,7 +60,19 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 
 			if eventPlugin := m.Events(); eventPlugin != nil {
 				if publisher, is := eventPlugin.(event.Publisher); is {
-					publisher.PublishOn(c.events)
+
+					pubChan := make(chan *event.Event)
+					go func() {
+						for {
+							event, ok := <-pubChan
+							if !ok {
+								return
+							}
+							c.events <- event
+						}
+					}()
+
+					publisher.PublishOn(pubChan)
 				}
 			}
 
@@ -91,16 +103,12 @@ func (c *Controller) Metadata() (plugins map[string]metadata.Plugin, err error) 
 	return plugins, nil
 }
 
-// Events exposes any events implementations
-func (c *Controller) Events() (plugins map[string]event.Plugin, err error) {
-	plugins = map[string]event.Plugin{
-		"events": c,
-	}
-	return plugins, nil
-}
-
 // List implements event.List
 func (c *Controller) List(topic types.Path) ([]string, error) {
+	return c.dynamicTopics(topic)
+}
+
+func (c *Controller) dynamicTopics(topic types.Path) ([]string, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
