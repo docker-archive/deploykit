@@ -111,7 +111,7 @@ func (c *Collection) EventID(v string) string {
 
 // NewCollection returns a Managed controller object that represents a collection
 // of finite state machines (FSM).
-func NewCollection(scope scope.Scope) (*Collection, error) {
+func NewCollection(scope scope.Scope, topics ...types.Path) (*Collection, error) {
 	c := &Collection{
 		scope:           scope,
 		items:           map[string]*Item{},
@@ -123,12 +123,12 @@ func NewCollection(scope scope.Scope) (*Collection, error) {
 
 	stub := func() interface{} { return "TODO" } // TODO - rationalize this
 
-	for _, topic := range []types.Path{
+	for _, topic := range append([]types.Path{
 		TopicMetadataUpdate,
 		TopicMetadataGone,
 		TopicCollectionUpdate,
 		TopicCollectionGone,
-	} {
+	}, topics...) {
 		types.Put(topic, stub, c.topics)
 	}
 	c.metadata = metadata_plugin.NewPluginFromChannel(c.metadataUpdates)

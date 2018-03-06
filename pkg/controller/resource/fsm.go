@@ -28,6 +28,8 @@ type Model struct {
 
 	instanceDestroyChan   chan fsm.FSM
 	instanceProvisionChan chan fsm.FSM
+	instancePendingChan   chan fsm.FSM
+	instanceReadyChan     chan fsm.FSM
 
 	lock sync.RWMutex
 }
@@ -35,6 +37,16 @@ type Model struct {
 // Destroy is the channel to get signals to destroy an instance
 func (m *Model) Destroy() <-chan fsm.FSM {
 	return m.instanceDestroyChan
+}
+
+// Pending is the channel to get signals that instances are in pending state
+func (m *Model) Pending() <-chan fsm.FSM {
+	return m.instancePendingChan
+}
+
+// Ready is the channel to get signals of instances that are ready
+func (m *Model) Ready() <-chan fsm.FSM {
+	return m.instanceReadyChan
 }
 
 // Provision is the channel to get signals to provision new instance
@@ -118,6 +130,8 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		Properties:            properties,
 		instanceDestroyChan:   make(chan fsm.FSM, properties.ChannelBufferSize),
 		instanceProvisionChan: make(chan fsm.FSM, properties.ChannelBufferSize),
+		instancePendingChan:   make(chan fsm.FSM, properties.ChannelBufferSize),
+		instanceReadyChan:     make(chan fsm.FSM, properties.ChannelBufferSize),
 		tickSize:              1 * time.Second,
 	}
 
@@ -153,6 +167,16 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 			Transitions: map[fsm.Signal]fsm.Index{
 				dependencyMissing: waiting,
 				resourceFound:     ready,
+			},
+			Actions: map[fsm.Signal]fsm.Action{
+				dependencyMissing: func(n fsm.FSM) error {
+					model.instancePendingChan <- n
+					return nil
+				},
+				resourceFound: func(n fsm.FSM) error {
+					model.instanceReadyChan <- n
+					return nil
+				},
 			},
 		},
 		fsm.State{

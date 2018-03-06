@@ -57,13 +57,13 @@ var (
 	TopicProvision = types.PathFromString("provision")
 
 	// TopicProvisionErr is the topic for provision error
-	TopicProvisionErr = types.PathFromString("provision/error")
+	TopicProvisionErr = types.PathFromString("error/provision")
 
 	// TopicDestroy is the topic for destroy
 	TopicDestroy = types.PathFromString("destroy")
 
 	// TopicDestroyErr is the topic for destroy error
-	TopicDestroyErr = types.PathFromString("destroy/error")
+	TopicDestroyErr = types.PathFromString("error/destroy")
 
 	// TopicPending is the topic for waiting for data
 	TopicPending = types.PathFromString("pending")
@@ -78,7 +78,14 @@ func newCollection(scope scope.Scope, options resource.Options) (internal.Manage
 		return nil, err
 	}
 
-	base, err := internal.NewCollection(scope)
+	base, err := internal.NewCollection(scope,
+		TopicProvision,
+		TopicProvisionErr,
+		TopicDestroy,
+		TopicDestroyErr,
+		TopicPending,
+		TopicReady,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -168,6 +175,34 @@ func (c *collection) run(ctx context.Context) {
 
 			select {
 
+			case f, ok := <-c.model.Ready():
+				if !ok {
+					return
+				}
+				item := c.Collection.GetByFSM(f)
+				if item != nil {
+					c.EventCh() <- event.Event{
+						Topic:   c.Topic(TopicReady),
+						Type:    event.Type("Ready"),
+						ID:      c.EventID(item.Key),
+						Message: "resource ready",
+					}.Init()
+				}
+
+			case f, ok := <-c.model.Pending():
+				if !ok {
+					return
+				}
+				item := c.Collection.GetByFSM(f)
+				if item != nil {
+					c.EventCh() <- event.Event{
+						Topic:   c.Topic(TopicPending),
+						Type:    event.Type("Pending"),
+						ID:      c.EventID(item.Key),
+						Message: "resource blocked waiting on dependencies",
+					}.Init()
+				}
+
 			case f, ok := <-c.model.Destroy():
 				if !ok {
 					return
@@ -184,9 +219,27 @@ func (c *collection) run(ctx context.Context) {
 						if dd, is := d.(instance.Description); is {
 							err := accessor.Destroy(dd.ID, instance.Termination)
 							log.Info("Destroy", "err", err)
+
+							if err == nil {
+								c.EventCh() <- event.Event{
+									Topic:   c.Topic(TopicDestroy),
+									Type:    event.Type("Destroy"),
+									ID:      c.EventID(item.Key),
+									Message: "destroying resource",
+								}.Init()
+							} else {
+								c.EventCh() <- event.Event{
+									Topic:   c.Topic(TopicDestroyErr),
+									Type:    event.Type("DestroyErr"),
+									ID:      c.EventID(item.Key),
+									Message: "destroying resource error",
+								}.Init().WithError(err)
+							}
+
 						}
 					}
 					c.Collection.Delete(item.Key)
+
 				}
 
 			case f, ok := <-c.model.Provision():
@@ -219,6 +272,13 @@ func (c *collection) run(ctx context.Context) {
 					} else {
 						log.Info("Provisioned", "id", instanceID)
 						/// don't do anything. next sample will make sure it moves to ready
+
+						c.EventCh() <- event.Event{
+							Topic:   c.Topic(TopicProvision),
+							Type:    event.Type("Provision"),
+							ID:      c.EventID(item.Key),
+							Message: "provisioning resource",
+						}.Init().WithDataMust(spec)
 					}
 				}
 

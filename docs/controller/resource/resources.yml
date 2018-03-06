@@ -2,6 +2,9 @@ kind: resource
 metadata:
   name: resources
 properties:
+  ModelProperties:
+    WaitBeforeProvision: 5
+    WaitBeforeDestroy: 60
   resources:
     az1-net1:
       plugin: az1/net
