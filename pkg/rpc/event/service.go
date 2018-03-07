@@ -28,12 +28,17 @@ type Event struct {
 	plugins func() (map[string]event.Plugin, error) // by type, as qualified in the name of the plugin
 }
 
-func (p *Event) typedPlugins() map[string]event.Plugin {
+func (p *Event) typedPlugins() (out map[string]event.Plugin) {
+	out = map[string]event.Plugin{}
+	if p.plugins == nil {
+		return
+	}
 	m, err := p.plugins()
 	if err != nil {
-		return map[string]event.Plugin{}
+		return
 	}
-	return m
+	out = m
+	return
 }
 
 // WithBase sets the base plugin to the given plugin object
