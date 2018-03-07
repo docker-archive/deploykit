@@ -13,7 +13,7 @@ rm -rf ~/.infrakit/configs/global.config # for file based manager
 # The simulators are started up with different names to mimic different resources
 INFRAKIT_MANAGER_CONTROLLERS=gc \
 infrakit plugin start manager:mystack vars group gc simulator:docker simulator:vm \
-	 --log 5 --log-stack --log-debug-V 500 \
+	 --log 5 --log-stack --log-debug-V 400 \
 	 --log-debug-match-exclude \
 	 --log-debug-match module=simulator/instance \
 	 --log-debug-match module=rpc/internal \

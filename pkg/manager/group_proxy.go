@@ -79,21 +79,6 @@ func (m *manager) removeConfig(id group.ID) error {
 	return stored.store(m.Options.SpecStore)
 }
 
-func (m *manager) queue(name string, work func() (retry bool, err error)) <-chan struct{} {
-	wait := make(chan struct{})
-	m.backendOps <- backendOp{
-		name: name,
-		operation: func() (bool, error) {
-			retry, err := work()
-			if err == nil && !retry {
-				close(wait)
-			}
-			return retry, err
-		},
-	}
-	return wait
-}
-
 // This implements/ overrides the Group Plugin interface to support single group-only operations
 func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err error) {
 

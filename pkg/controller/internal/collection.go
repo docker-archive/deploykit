@@ -339,7 +339,6 @@ func (c *Collection) Scope() scope.Scope {
 
 // object returns the state
 func (c *Collection) object() (object *types.Object, err error) {
-	defer log.Debug("object", "ref", object, "err", err)
 	snapshot, e := c.snapshot()
 	if e != nil {
 		err = e
@@ -411,70 +410,101 @@ func (c *Collection) Stop() error {
 	return c.StopFunc()
 }
 
-// Plan returns a plan, the current state, or error
-func (c *Collection) Plan(v controller.Operation, s types.Spec) (*types.Object, *controller.Plan, error) {
+func (c *Collection) writeTxn(txn func() error) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	return txn()
+}
+
+func (c *Collection) readTxn(txn func() error) error {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+	return txn()
+}
 
-	log.Debug("Plan", "op", v, "spec", s, "V", debugV)
+// Plan returns a plan, the current state, or error
+func (c *Collection) Plan(op controller.Operation,
+	spec types.Spec) (object *types.Object, plan *controller.Plan, err error) {
 
-	o, err := c.object()
-	if err != nil {
-		return nil, nil, err
-	}
+	err = c.readTxn(func() error {
 
-	if c.PlanFunc == nil {
-		return o, nil, err
-	}
+		log.Debug("Plan", "op", op, "spec", spec, "V", debugV)
 
-	p, err := c.PlanFunc(v, s)
-	return o, &p, err
+		object, err = c.object()
+		if err != nil {
+			return err
+		}
+
+		if c.PlanFunc == nil {
+			return nil
+		}
+
+		if p, e := c.PlanFunc(op, spec); e == nil {
+			plan = &p
+		} else {
+			err = e
+		}
+
+		return err
+	})
+	return
 }
 
 // Enforce will call the behavior to update the spec once it passes validation, and the collection
 // will start running / polling.  Since the collection is one-time use (it gets created and replaced by
 // the base controller implementation), enforce will be called only once.
-func (c *Collection) Enforce(spec types.Spec) (*types.Object, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (c *Collection) Enforce(spec types.Spec) (object *types.Object, err error) {
 
-	defer log.Debug("Enforce", "spec", spec, "V", debugV)
+	if err := c.writeTxn(func() error {
 
-	if c.UpdateSpecFunc != nil {
-		if err := c.UpdateSpecFunc(spec); err != nil {
-			log.Error("updating spec", "err", err)
-			return nil, err
+		if c.UpdateSpecFunc != nil {
+			if err := c.UpdateSpecFunc(spec); err != nil {
+				log.Error("updating spec", "err", err)
+				return err
+			}
 		}
-	}
-	c.freed = false
-	c.Spec = spec
-	c.items = map[string]*Item{} // reset
+		c.freed = false
+		c.Spec = spec
+		c.items = map[string]*Item{} // reset
 
-	c.start()
-	return c.object()
+		c.start()
+		log.Debug("started", "V", debugV2)
+		return nil
+
+	}); err != nil {
+		return nil, err
+	}
+
+	err = c.readTxn(func() error {
+
+		object, err = c.object()
+		log.Debug("Called enforce", "spec", spec, "object", object, "V", debugV)
+
+		return err
+	})
+
+	return
 }
 
 // Inspect inspects the current state of the collection.
-func (c *Collection) Inspect() (*types.Object, error) {
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-
-	v, err := c.object()
-	log.Debug("Inspect", "object", *v, "err", err, "V", debugV)
-
-	return v, err
+func (c *Collection) Inspect() (object *types.Object, err error) {
+	err = c.readTxn(func() error {
+		object, err = c.object()
+		log.Debug("Inspect", "object", object, "err", err, "V", debugV)
+		return err
+	})
+	return
 }
 
 // Pause pauses the collection from monitoring and reconciling. This is temporary compared to Stop.
-func (c *Collection) Pause() (*types.Object, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
+func (c *Collection) Pause() (object *types.Object, err error) {
+	err = c.writeTxn(func() error {
+		if c.PauseFunc != nil {
+			c.PauseFunc(true)
+		}
+		return nil
+	})
 
-	if c.PauseFunc == nil {
-		return c.Inspect()
-	}
-
-	c.PauseFunc(true)
 	return c.Inspect()
 }
 
@@ -484,18 +514,17 @@ func (c *Collection) Free() (*types.Object, error) {
 }
 
 // Terminate destroys the resources associated with this collection.
-func (c *Collection) Terminate() (*types.Object, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	if c.TerminateFunc != nil {
-		err := c.TerminateFunc()
-		if err != nil {
-			return nil, err
+func (c *Collection) Terminate() (object *types.Object, err error) {
+	err = c.writeTxn(func() error {
+		if c.TerminateFunc != nil {
+			return c.TerminateFunc()
 		}
-		return c.Inspect()
+		return fmt.Errorf("not supported")
+	})
+	if err == nil {
+		object, err = c.Inspect()
 	}
-	return nil, fmt.Errorf("not supported")
+	return
 }
 
 func (c *Collection) snapshot() (*types.Any, error) {

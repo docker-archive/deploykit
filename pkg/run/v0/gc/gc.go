@@ -74,6 +74,7 @@ func Run(scope scope.Scope, name plugin.Name,
 	leader := func() stack.Leadership {
 		return leadership(scope.Plugins)
 	}
+
 	gc := gc.NewController(scope, options)
 
 	impls = map[run.PluginCode]interface{}{
