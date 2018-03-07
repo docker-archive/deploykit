@@ -30,7 +30,8 @@ var (
 
 type resources map[string]instance.Description
 
-func (r resources) eval(p types.Path) (interface{}, error) {
+func (r *resources) eval(p types.Path) (interface{}, error) {
+	log.Debug(">>>>>>eval", "path", p, "from", r)
 	v := types.Get(p, r)
 	if v == nil {
 		return nil, fmt.Errorf("missing data")
@@ -149,14 +150,14 @@ func (c *collection) run(ctx context.Context) {
 				select {
 				case list, ok := <-accessor.Observations():
 					if !ok {
-						log.Debug("found observations done", "name", name, "V", debugV)
+						log.Debug("found observations done", "name", name, "V", debugV2)
 						return
 					}
 					foundInstances <- &observation{name: name, instances: list}
 
 				case list, ok := <-accessor.Lost():
 					if !ok {
-						log.Debug("lost events done", "name", name, "V", debugV)
+						log.Debug("lost events done", "name", name, "V", debugV2)
 						return
 					}
 					lostInstances <- &observation{name: name, instances: list}
@@ -250,16 +251,22 @@ func (c *collection) run(ctx context.Context) {
 				item := c.Collection.GetByFSM(f)
 				if item != nil {
 					accessor := c.properties.Resources[item.Key]
-					log.Info("Provision", "fsm", f.ID(), "item", item, "accessor", accessor)
-
 					spec, err := c.populateDependencies(item.Key, accessor.Spec)
 					if err != nil {
+
+						log.Error("Dependency missing",
+							"fsm", f.ID(), "item", item,
+							"accessor", accessor, "spec", spec,
+							"err", err)
+
 						item.State.Signal(dependencyMissing)
 						continue
 					}
+
 					instanceID, err := accessor.Provision(spec)
 					if err != nil {
-						log.Error("cannot provision", "err", err)
+
+						log.Error("Cannot provision", "err", err)
 						item.State.Signal(provisionError)
 
 						c.EventCh() <- event.Event{
@@ -270,7 +277,14 @@ func (c *collection) run(ctx context.Context) {
 						}.Init().WithError(err)
 
 					} else {
-						log.Info("Provisioned", "id", instanceID)
+
+						id := ""
+						if instanceID != nil {
+							id = string(*instanceID)
+						}
+
+						log.Info("Provisioned", "id", id, "spec", spec)
+
 						/// don't do anything. next sample will make sure it moves to ready
 
 						c.EventCh() <- event.Event{
@@ -499,10 +513,19 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 		return spec, err
 	}
 
-	properties, _ = dependV(properties, c.resources.eval) // should have all values populated
+	properties = dependV(properties,
+		func(p types.Path) (interface{}, error) {
+			v := types.Get(p, c.resources)
+			return v, nil
+		}) // should have all values populated
+
 	any, err := types.AnyValue(properties)
 	if err != nil {
 		return spec, err
+	}
+
+	if depends := depends(any); len(depends) > 0 {
+		return spec, fmt.Errorf("missing data %v", any.String())
 	}
 
 	processed.Properties = any
@@ -520,6 +543,7 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 			processed.Tags[k] = v
 		}
 	}
+
 	return processed, nil
 }
 
@@ -530,37 +554,30 @@ const (
 	ResourceCollectionLabel = "infrakit_resource_collection"
 )
 
-func dependV(v interface{}, fetcher func(types.Path) (interface{}, error)) (interface{}, bool) {
-	substituted := false
+func dependV(v interface{}, fetcher func(types.Path) (interface{}, error)) interface{} {
 	switch v := v.(type) {
 	case map[string]interface{}:
 		for k, vv := range v {
-			newV, substitute := dependV(vv, fetcher)
-			if substitute {
-				v[k] = newV
-				substituted = true
-			}
+			v[k] = dependV(vv, fetcher)
 		}
 	case []interface{}:
 		for i, vv := range v {
-			newV, substitute := dependV(vv, fetcher)
-			if substitute {
-				v[i] = newV
-				substituted = true
-			}
+			v[i] = dependV(vv, fetcher)
 		}
 	case string:
 		if p, ok := parseDepends(v); ok {
 			// found a depend, now get the real value and swap
 			newV, err := fetcher(p)
 			if err != nil {
-				return err, true // return an error attached at the same location
+				return err.Error()
 			}
-			return newV, true
+			if newV != nil {
+				return newV
+			}
 		}
 	default:
 	}
-	return v, substituted
+	return v
 }
 
 func keyFromPath(path types.Path) (key string, err error) {

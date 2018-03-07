@@ -126,6 +126,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		return nil, fmt.Errorf("invalid WaitBeforeProvision tickSize")
 	}
 
+	log.Info("Build model", "properties", properties)
 	model := &Model{
 		Properties:            properties,
 		instanceDestroyChan:   make(chan fsm.FSM, properties.ChannelBufferSize),

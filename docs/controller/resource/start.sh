@@ -13,10 +13,12 @@ rm -rf ~/.infrakit/configs/global.config # for file based manager
 # The simulators are started up with different names to mimic different resources
 INFRAKIT_MANAGER_CONTROLLERS=resource \
 infrakit plugin start manager:mystack vars group resource simulator:az1 simulator:az2 time \
-	 --log 5 --log-stack --log-debug-V 400 \
+	 --log 5 --log-stack --log-debug-V 800 \
 	 --log-debug-match-exclude \
 	 --log-debug-match module=core/fsm \
 	 --log-debug-match module=simulator/instance \
+	 --log-debug-match module=rpc/client \
+	 --log-debug-match module=rpc/server \
 	 --log-debug-match module=rpc/internal \
 	 --log-debug-match module=run/manager \
 	 --log-debug-match module=run/scope

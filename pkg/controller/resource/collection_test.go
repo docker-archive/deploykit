@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	resource "github.com/docker/infrakit/pkg/controller/resource/types"
+	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/testing/scope"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
@@ -161,13 +162,14 @@ field5: "@depend('net1/foo/bar/4')@"
 			`net1/foo/bar/3/4`: []string{"3", "4"},
 			`net1/foo/bar/4`:   map[string]string{"foo": "bar"},
 		}
+
 		fetch := func(p types.Path) (interface{}, error) {
 			return store[p.String()], nil
 		}
 
-		vv, substitute := dependV(v, fetch)
-		require.True(t, substitute)
+		// add value
 
+		vv := dependV(v, fetch)
 		require.Equal(t, store[`net1/foo/bar/1`], types.Get(types.PathFromString(`field3`), vv))
 		require.Equal(t, store[`net1/foo/bar/2`], types.Get(types.PathFromString(`field4/object_field2`), vv))
 		require.Equal(t, store[`net1/foo/bar/3/1`], types.Get(types.PathFromString(`field4/object_field3/[0]/element1`), vv))
@@ -177,7 +179,68 @@ field5: "@depend('net1/foo/bar/4')@"
 		require.Equal(t, store[`net1/foo/bar/4`], types.Get(types.PathFromString(`field5`), vv))
 
 	}
+	{
+		var v interface{}
+		require.NoError(t, types.Decode([]byte(`
+field1: bar
+field2: 2
+field3: "@depend('net1/foo/bar/1')@"
+field4:
+  object_field1 : test
+  object_field2 : "@depend('net1/foo/bar/2')@"
+  object_field3 :
+    - element1: "@depend('net1/foo/bar/3/1')@"
+    - element2: "@depend('net1/foo/bar/3/2')@"
+    - element3: "@depend('net1/foo/bar/3/3')@"
+    - element4: "@depend('net1/foo/bar/3/4')@"
+field5: "@depend('net1/foo/bar/4')@"
+`), &v))
 
+		store := map[string]interface{}{
+			`net1/foo/bar/1`:   true,
+			`net1/foo/bar/2`:   2,
+			`net1/foo/bar/3/3`: "3-3",
+			`net1/foo/bar/3/4`: []string{"3", "4"},
+		}
+
+		fetch := func(p types.Path) (interface{}, error) {
+			return store[p.String()], nil
+		}
+
+		vv := dependV(v, fetch)
+		any := types.AnyValueMust(vv)
+		depends := depends(any)
+		require.Equal(t, 3, len(depends))
+	}
+}
+
+func TestGetByPath(t *testing.T) {
+
+	m := map[string]instance.Description{
+		"disk1": {
+			ID: instance.ID("1"),
+			Tags: map[string]string{
+				"tag1": "1",
+			},
+			Properties: types.AnyValueMust(map[string]string{
+				"size": "1TB",
+			}),
+		},
+		"disk2": {
+			ID: instance.ID("2"),
+			Tags: map[string]string{
+				"tag1": "2",
+			},
+			Properties: types.AnyValueMust(map[string]string{
+				"size": "2TB",
+			}),
+		},
+	}
+
+	require.Equal(t, "1", types.Get(types.PathFromString(`disk1/Tags/tag1`), m))
+	require.Equal(t, "2", types.Get(types.PathFromString(`disk2/Tags/tag1`), m))
+	require.Equal(t, instance.ID("1"), types.Get(types.PathFromString(`disk1/ID`), m))
+	require.Equal(t, "1TB", types.Get(types.PathFromString(`disk1/Properties/size`), m))
 }
 
 func TestProcessWatches(t *testing.T) {

@@ -114,20 +114,19 @@ func (m controllerAdapter) Commit(op controller.Operation, spec types.Spec) (obj
 		return
 	}
 
+	switch op {
+	case controller.Enforce:
+		err = m.manager.updateSpec(spec, m.name)
+	case controller.Destroy:
+		err = m.manager.removeSpec(spec)
+	}
+	if err != nil {
+		return
+	}
+
 	retry := true
 	<-m.manager.queue("commit",
 		func() (bool, error) {
-
-			switch op {
-			case controller.Enforce:
-				err = m.manager.updateSpec(spec, m.name)
-			case controller.Destroy:
-				err = m.manager.removeSpec(spec)
-			}
-			if err != nil {
-				return retry, err
-			}
-
 			object, err = m.backend.Commit(op, spec)
 			return retry, err
 		})
@@ -165,7 +164,6 @@ func (m controllerAdapter) Free(search *types.Metadata) (found []types.Object, e
 	retry := false
 	<-m.manager.queue("free",
 		func() (bool, error) {
-
 			found, err = m.backend.Free(search)
 			return retry, err
 		})
