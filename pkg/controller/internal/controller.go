@@ -12,11 +12,12 @@ import (
 
 // Controller implements the pkg/controller/Controller interface and manages a collection of controls
 type Controller struct {
-	alloc   func(types.Spec) (Managed, error)
-	keyfunc func(types.Metadata) string
-	managed map[string]*Managed
-	events  chan<- *event.Event
-	lock    sync.RWMutex
+	alloc    func(types.Spec) (Managed, error)
+	keyfunc  func(types.Metadata) string
+	managed  map[string]*Managed
+	pubChans map[string]chan *event.Event
+	events   chan<- *event.Event
+	lock     sync.RWMutex
 }
 
 // NewController creates a controller injecting dependencies
@@ -24,9 +25,10 @@ func NewController(alloc func(types.Spec) (Managed, error),
 	keyfunc func(types.Metadata) string) *Controller {
 
 	c := &Controller{
-		keyfunc: keyfunc,
-		alloc:   alloc,
-		managed: map[string]*Managed{},
+		keyfunc:  keyfunc,
+		alloc:    alloc,
+		managed:  map[string]*Managed{},
+		pubChans: map[string]chan *event.Event{},
 	}
 	return c
 }
@@ -51,30 +53,14 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 
 	if _, has := c.managed[key]; !has {
 		if spec != nil {
-			m, err := c.alloc(*spec)
+
+			m, pubChan, err := c.allocManaged(spec)
 			if err != nil {
 				return nil, err
 			}
 
 			c.managed[key] = &m
-
-			if eventPlugin := m.Events(); eventPlugin != nil {
-				if publisher, is := eventPlugin.(event.Publisher); is {
-
-					pubChan := make(chan *event.Event)
-					go func() {
-						for {
-							event, ok := <-pubChan
-							if !ok {
-								return
-							}
-							c.events <- event
-						}
-					}()
-
-					publisher.PublishOn(pubChan)
-				}
-			}
+			c.pubChans[key] = pubChan
 
 		} else {
 			return out, nil
@@ -85,6 +71,35 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 
 	log.Debug("found managed", "search", search, "spec", spec, "found", out)
 	return out, nil
+}
+
+func (c *Controller) allocManaged(spec *types.Spec) (m Managed, pubChan chan *event.Event, err error) {
+	m, err = c.alloc(*spec)
+	if err != nil {
+		return
+	}
+
+	if eventPlugin := m.Events(); eventPlugin != nil {
+		if publisher, is := eventPlugin.(event.Publisher); is {
+
+			pubChan = make(chan *event.Event)
+
+			go func() {
+				// This goroutine will take the events from the Managed (Collection) and
+				// forward it to the channel which it was given by the RPC layer.
+				for {
+					event, ok := <-pubChan
+					if !ok {
+						return
+					}
+					c.events <- event
+				}
+			}()
+			publisher.PublishOn(pubChan)
+		}
+	}
+
+	return
 }
 
 // Metadata exposes any metdata implementations
@@ -227,16 +242,16 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 				}
 			}
 
-			newManaged, err := c.alloc(spec)
-			if err != nil {
-				log.Error("cannot allocate a new managed object", "spec", spec, "err", err)
-				return types.Object{}, err
-			}
-
 			// Tell the old to stop
 			(*managed).Stop()
 
 			log.Debug("Currently running managed object", "managed", m[0])
+
+			newManaged, _, err := c.allocManaged(&spec)
+			if err != nil {
+				log.Error("cannot allocate a new managed object", "spec", spec, "err", err)
+				return types.Object{}, err
+			}
 
 			// swap
 			**m[0] = newManaged

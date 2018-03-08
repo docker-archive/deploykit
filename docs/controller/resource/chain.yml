@@ -2,7 +2,7 @@ kind: resource
 metadata:
   name: chain
 properties:
-  WaitBeforeProvision: 1
+  WaitBeforeProvision: 10
   WaitBeforeDestroy: 60
   resources:
     az1-net1:

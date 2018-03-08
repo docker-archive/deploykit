@@ -161,6 +161,7 @@ func (c *Collection) PublishOn(events chan<- *event.Event) {
 		for {
 			evt, ok := <-c.events
 			if !ok {
+				close(events)
 				return
 			}
 			events <- evt
@@ -265,12 +266,14 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 
 	defer func() {
 		if changed {
+			fmt.Println(">>>>>>>>>>>>>>>1")
 			c.events <- event.Event{
 				Topic:   c.Topic(TopicCollectionUpdate),
 				Type:    event.Type("CollectionUpdate"),
 				ID:      c.EventID(k),
 				Message: "update collection",
 			}.Init().WithDataMust(spec.StateName(fsm.State()))
+			fmt.Println(">>>>>>>>>>>>>>>2")
 		}
 	}()
 
