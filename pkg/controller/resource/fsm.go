@@ -30,8 +30,14 @@ type Model struct {
 	instanceProvisionChan chan fsm.FSM
 	instancePendingChan   chan fsm.FSM
 	instanceReadyChan     chan fsm.FSM
+	cleanupChan           chan fsm.FSM
 
 	lock sync.RWMutex
+}
+
+// Cleanup is the channel to get signals to clean up
+func (m *Model) Cleanup() <-chan fsm.FSM {
+	return m.cleanupChan
 }
 
 // Destroy is the channel to get signals to destroy an instance
@@ -117,6 +123,7 @@ const (
 	dependencyMissing
 	dependencyReady
 	terminate
+	cleanup
 )
 
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
@@ -133,6 +140,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		instanceProvisionChan: make(chan fsm.FSM, properties.ChannelBufferSize),
 		instancePendingChan:   make(chan fsm.FSM, properties.ChannelBufferSize),
 		instanceReadyChan:     make(chan fsm.FSM, properties.ChannelBufferSize),
+		cleanupChan:           make(chan fsm.FSM, properties.ChannelBufferSize),
 		tickSize:              1 * time.Second,
 	}
 
@@ -231,6 +239,16 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		},
 		fsm.State{
 			Index: terminated,
+			TTL:   fsm.Expiry{properties.WaitBeforeDestroy, cleanup},
+			Transitions: map[fsm.Signal]fsm.Index{
+				cleanup: terminated, // TODO - this is really unnecessary
+			},
+			Actions: map[fsm.Signal]fsm.Action{
+				cleanup: func(n fsm.FSM) error {
+					model.cleanupChan <- n
+					return nil
+				},
+			},
 		},
 	)
 
@@ -252,6 +270,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		resourceLost:      "resource_lost",
 		provision:         "provision",
 		terminate:         "terminate",
+		cleanup:           "cleanup",
 		provisionError:    "provision_error",
 		dependencyMissing: "dependency_missing",
 		dependencyReady:   "dependency_ready",

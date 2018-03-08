@@ -168,6 +168,14 @@ func (c *collection) run(ctx context.Context) {
 
 			select {
 
+			case f, ok := <-c.model.Cleanup():
+				if !ok {
+					return
+				}
+				item := c.Collection.GetByFSM(f)
+				if item != nil {
+					c.Collection.Delete(item.Key)
+				}
 			case f, ok := <-c.model.Ready():
 				if !ok {
 					return
@@ -203,8 +211,6 @@ func (c *collection) run(ctx context.Context) {
 
 				item := c.Collection.GetByFSM(f)
 				if item != nil {
-
-					c.Collection.Delete(item.Key) // immediately to prevent other signals from accessing it
 
 					accessor := c.properties.Resources[item.Key]
 					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
