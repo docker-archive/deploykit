@@ -64,6 +64,8 @@ type Collection struct {
 
 	types.Spec
 
+	previous types.Spec
+
 	items map[string]*Item // read/writes of this will not be synchronized by the lock.
 	stop  chan struct{}
 
@@ -266,14 +268,12 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 
 	defer func() {
 		if changed {
-			fmt.Println(">>>>>>>>>>>>>>>1")
 			c.events <- event.Event{
 				Topic:   c.Topic(TopicCollectionUpdate),
 				Type:    event.Type("CollectionUpdate"),
 				ID:      c.EventID(k),
 				Message: "update collection",
 			}.Init().WithDataMust(spec.StateName(fsm.State()))
-			fmt.Println(">>>>>>>>>>>>>>>2")
 		}
 	}()
 
@@ -302,6 +302,34 @@ func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]
 		}
 	}
 	return c.items[k]
+}
+
+// CurrentSpec returns the spec this collection is enforcing
+func (c *Collection) CurrentSpec() (s types.Spec) {
+	c.readTxn(func() error {
+		s = c.Spec
+		return nil
+	})
+	return
+}
+
+// SetPrevSpec sets the spec that a previous version of the collection was managing.
+// This gives the context to the collection so that it is able to remove resources
+// that no longer are needed, for example.
+func (c *Collection) SetPrevSpec(s types.Spec) {
+	c.writeTxn(func() error {
+		c.previous = s
+		return nil
+	})
+}
+
+// GetPrevSpec returns the spec the this collection continues from.
+func (c *Collection) GetPrevSpec() (s types.Spec) {
+	c.readTxn(func() error {
+		s = c.previous
+		return nil
+	})
+	return
 }
 
 // Get returns an item by key. This is unsynchronized so caller / user needs to synchronize as needed.

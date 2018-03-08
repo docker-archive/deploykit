@@ -76,6 +76,23 @@ func newEnroller(scope scope.Scope, options enrollment.Options) (*enroller, erro
 	return l, nil
 }
 
+// CurrentSpec returns the spec this collection is enforcing
+func (l *enroller) CurrentSpec() (s types.Spec) {
+	return
+}
+
+// SetPrevSpec sets the spec that a previous version of the collection was managing.
+// This gives the context to the collection so that it is able to remove resources
+// that no longer are needed, for example.
+func (l *enroller) SetPrevSpec(s types.Spec) {
+	return
+}
+
+// GetPrevSpec returns the spec the this collection continues from.
+func (l *enroller) GetPrevSpec() (s types.Spec) {
+	return
+}
+
 // Metadata returns an optional metadata.Plugin implementation
 func (l *enroller) Metadata() metadata.Plugin {
 	return nil

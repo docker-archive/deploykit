@@ -12,12 +12,11 @@ import (
 
 // Controller implements the pkg/controller/Controller interface and manages a collection of controls
 type Controller struct {
-	alloc    func(types.Spec) (Managed, error)
-	keyfunc  func(types.Metadata) string
-	managed  map[string]*Managed
-	pubChans map[string]chan *event.Event
-	events   chan<- *event.Event
-	lock     sync.RWMutex
+	alloc   func(types.Spec) (Managed, error)
+	keyfunc func(types.Metadata) string
+	managed map[string]*Managed
+	events  chan<- *event.Event
+	lock    sync.RWMutex
 }
 
 // NewController creates a controller injecting dependencies
@@ -25,10 +24,9 @@ func NewController(alloc func(types.Spec) (Managed, error),
 	keyfunc func(types.Metadata) string) *Controller {
 
 	c := &Controller{
-		keyfunc:  keyfunc,
-		alloc:    alloc,
-		managed:  map[string]*Managed{},
-		pubChans: map[string]chan *event.Event{},
+		keyfunc: keyfunc,
+		alloc:   alloc,
+		managed: map[string]*Managed{},
 	}
 	return c
 }
@@ -54,13 +52,12 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 	if _, has := c.managed[key]; !has {
 		if spec != nil {
 
-			m, pubChan, err := c.allocManaged(spec)
+			m, _, err := c.allocManaged(spec)
 			if err != nil {
 				return nil, err
 			}
 
 			c.managed[key] = &m
-			c.pubChans[key] = pubChan
 
 		} else {
 			return out, nil
@@ -252,6 +249,9 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 				log.Error("cannot allocate a new managed object", "spec", spec, "err", err)
 				return types.Object{}, err
 			}
+
+			// continuity of context / spec
+			newManaged.SetPrevSpec((*managed).CurrentSpec())
 
 			// swap
 			**m[0] = newManaged

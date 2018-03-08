@@ -25,6 +25,10 @@ type ControlLoop interface {
 type Managed interface {
 	ControlLoop
 
+	CurrentSpec() types.Spec
+	SetPrevSpec(types.Spec)
+	GetPrevSpec() types.Spec
+
 	Metadata() metadata.Plugin
 	Events() event.Plugin
 

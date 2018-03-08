@@ -125,3 +125,20 @@ func (c *managed) Metadata() metadata.Plugin {
 func (c *managed) Events() event.Plugin {
 	return nil
 }
+
+// CurrentSpec returns the spec this collection is enforcing
+func (c *managed) CurrentSpec() (s types.Spec) {
+	return
+}
+
+// SetPrevSpec sets the spec that a previous version of the collection was managing.
+// This gives the context to the collection so that it is able to remove resources
+// that no longer are needed, for example.
+func (c *managed) SetPrevSpec(s types.Spec) {
+	return
+}
+
+// GetPrevSpec returns the spec the this collection continues from.
+func (c *managed) GetPrevSpec() (s types.Spec) {
+	return
+}

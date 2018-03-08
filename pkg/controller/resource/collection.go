@@ -30,15 +30,6 @@ var (
 
 type resources map[string]instance.Description
 
-func (r *resources) eval(p types.Path) (interface{}, error) {
-	log.Debug(">>>>>>eval", "path", p, "from", r)
-	v := types.Get(p, r)
-	if v == nil {
-		return nil, fmt.Errorf("missing data")
-	}
-	return v, nil
-}
-
 type collection struct {
 	*internal.Collection
 
@@ -172,6 +163,7 @@ func (c *collection) run(ctx context.Context) {
 
 	go func() {
 
+	loop:
 		for {
 
 			select {
@@ -211,36 +203,71 @@ func (c *collection) run(ctx context.Context) {
 
 				item := c.Collection.GetByFSM(f)
 				if item != nil {
+
+					c.Collection.Delete(item.Key) // immediately to prevent other signals from accessing it
+
 					accessor := c.properties.Resources[item.Key]
 					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
 
-					// TODO - call instancePlugin.Destroy
-					d := item.Data["instance"]
-					if d != nil {
-						if dd, is := d.(instance.Description); is {
-							err := accessor.Destroy(dd.ID, instance.Termination)
-							log.Info("Destroy", "err", err)
+					// !!!! This actually is *always* nil in the case where the accessor
+					// section has been removed and we discover an instance that doesn't
+					// correspond to anything.
+					// The correct approach would be to use the *previous* version of the spec
+					if accessor == nil {
+						// try the last version
+						prevProperties := DefaultProperties
+						if err := c.GetPrevSpec().Properties.Decode(&prevProperties); err == nil {
+							log.Debug("Looking for accessor in previous version",
+								"key", item.Key, "properties", prevProperties)
 
-							if err == nil {
-								c.EventCh() <- event.Event{
-									Topic:   c.Topic(TopicDestroy),
-									Type:    event.Type("Destroy"),
-									ID:      c.EventID(item.Key),
-									Message: "destroying resource",
-								}.Init()
-							} else {
-								c.EventCh() <- event.Event{
-									Topic:   c.Topic(TopicDestroyErr),
-									Type:    event.Type("DestroyErr"),
-									ID:      c.EventID(item.Key),
-									Message: "destroying resource error",
-								}.Init().WithError(err)
+							accessor = prevProperties.Resources[item.Key]
+							if err := accessor.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second)); err != nil {
+								log.Error("cannot initialize accessor from previous version",
+									"key", item.Key, "err", err)
+
+								accessor = nil
 							}
 
 						}
 					}
-					c.Collection.Delete(item.Key)
 
+					if accessor == nil {
+						log.Error("cannot find accessor for key", "key", item.Key)
+						continue loop
+					}
+
+					// TODO - call instancePlugin.Destroy
+					d := item.Data["instance"]
+					if d == nil {
+						log.Error("cannot find instance", "item", item.Key)
+						continue loop
+					}
+
+					if dd, is := d.(instance.Description); is {
+
+						log.Info("Destroy", "instanceID", dd.ID, "key", item.Key)
+						err := accessor.Destroy(dd.ID, instance.Termination)
+						log.Debug("destroy", "instanceID", dd.ID, "key", item.Key, "err", err)
+
+						if err != nil {
+							c.EventCh() <- event.Event{
+								Topic:   c.Topic(TopicDestroyErr),
+								Type:    event.Type("DestroyErr"),
+								ID:      c.EventID(item.Key),
+								Message: "destroying resource error",
+							}.Init().WithError(err)
+						} else {
+							c.EventCh() <- event.Event{
+								Topic:   c.Topic(TopicDestroy),
+								Type:    event.Type("Destroy"),
+								ID:      c.EventID(item.Key),
+								Message: "destroyed resource",
+							}.Init()
+						}
+
+						// now stop the accessor
+						accessor.Stop()
+					}
 				}
 
 			case f, ok := <-c.model.Provision():
@@ -397,7 +424,7 @@ func (c *collection) run(ctx context.Context) {
 		}
 	}()
 
-	log.Debug("Components running. About to seed instances")
+	log.Debug("Seeding instances")
 
 	// Seed the initial fsm instances for each named resource in the config
 	// For each accessor / resource we create one fsm
@@ -458,6 +485,7 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 		}
 	}
 
+	log.Debug("Process watches / dependencies")
 	watch, watching := processWatches(properties)
 	log.Debug("watch/watching", "watch", watch, "watching", watching)
 
@@ -469,9 +497,9 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 	}
 
 	c.model = model
+	c.properties = &properties
 	c.watch = watch
 	c.watching = watching
-	c.properties = &properties
 	return
 }
 

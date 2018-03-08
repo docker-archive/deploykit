@@ -245,7 +245,8 @@ func TestGetByPath(t *testing.T) {
 
 func TestProcessWatches(t *testing.T) {
 
-	watch, watching := processWatches(testProperties(t))
+	properties := testProperties(t)
+	watch, watching := processWatches(properties)
 
 	// check the file... count the number of occurrences
 	require.Equal(t, 5, len(watch.watchers["az1-net1"]))

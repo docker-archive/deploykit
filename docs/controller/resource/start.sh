@@ -21,4 +21,4 @@ infrakit plugin start manager:mystack vars group resource simulator:az1 simulato
 	 --log-debug-match module=rpc/server \
 	 --log-debug-match module=run/manager \
 	 --log-debug-match module=run/scope \
-	# --log-debug-match module=rpc/internal \
+	 --log-debug-match module=rpc/internal \
