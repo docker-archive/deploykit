@@ -33,6 +33,11 @@ func Unescape(source []byte) []byte {
 	return buff
 }
 
+// EscapeString returns an escaped string
+func EscapeString(source string) string {
+	return string(Escape([]byte(source)))
+}
+
 // Escape replaces all the {{ and }} with \{\{ and \}\} to escape template content.
 func Escape(source []byte) []byte {
 	if source == nil {

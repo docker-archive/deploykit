@@ -54,7 +54,7 @@ KeySelector: \{\{.link\}\}
 		return testInstancePlugin, nil
 	}
 
-	err = observer.Init(testScope, testutil_scope.FakeLeader(true), 1*time.Second)
+	err = observer.Init(testScope, 1*time.Second)
 	require.NoError(t, err)
 
 	observer.Start()
@@ -134,7 +134,7 @@ KeySelector: \{\{.link\}\}
 		return testInstancePlugin, nil
 	}
 
-	err = observer.Init(testScope, testutil_scope.FakeLeader(true), 1*time.Second)
+	err = observer.Init(testScope, 1*time.Second)
 	require.NoError(t, err)
 
 	observer.Start()
@@ -170,4 +170,26 @@ loop:
 		}
 		count++
 	}
+	require.True(t, count > 1)
+
+	itr := 0
+loop2:
+	for lost := range observer.Lost() {
+
+		switch itr {
+		case 0:
+			require.Equal(t, types.AnyValueMust([]instance.Description{}), types.AnyValueMust(lost))
+		case 1:
+			require.Equal(t, types.AnyValueMust([]instance.Description{
+				{ID: "id2", Properties: types.AnyValueMust(map[string]string{"link": "link2"})},
+				{ID: "id4", Properties: types.AnyValueMust(map[string]string{"link": "link4"})},
+			}), types.AnyValueMust(lost))
+		default:
+			observer.Stop()
+			break loop2
+		}
+		itr++
+	}
+	require.True(t, itr > 1)
+
 }

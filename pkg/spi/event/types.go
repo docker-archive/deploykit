@@ -27,6 +27,9 @@ type Event struct {
 	// ID is unique id for the event.
 	ID string
 
+	// Message is an optional human-friendly message
+	Message string
+
 	// Timestamp is the time.UnixNano() value -- this is the timestamp when event occurred
 	Timestamp time.Time
 
@@ -43,7 +46,7 @@ type Event struct {
 // Init creates an instance with the value initialized to the state of receiver.
 func (event Event) Init() *Event {
 	copy := event
-	return &copy
+	return copy.Now()
 }
 
 // WithError sets the error
@@ -61,6 +64,12 @@ func (event *Event) WithTopic(s string) *Event {
 // WithType sets the type from a string
 func (event *Event) WithType(s string) *Event {
 	event.Type = Type(s)
+	return event
+}
+
+// WithMessage sets the message
+func (event *Event) WithMessage(s string) *Event {
+	event.Message = s
 	return event
 }
 
@@ -90,7 +99,7 @@ func (event *Event) WithData(data interface{}) (*Event, error) {
 func (event *Event) WithDataMust(data interface{}) *Event {
 	e, err := event.WithData(data)
 	if err != nil {
-		panic(err)
+		event.Data = types.AnyString(err.Error())
 	}
 	return e
 }

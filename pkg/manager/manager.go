@@ -156,6 +156,24 @@ func (m *manager) LeaderLocation() (*url.URL, error) {
 	return m.Options.LeaderStore.GetLocation()
 }
 
+func (m *manager) queue(name string, work func() (retry bool, err error)) <-chan struct{} {
+	wait := make(chan struct{})
+	m.backendOps <- backendOp{
+		name: name,
+		operation: func() (bool, error) {
+			retry, err := work()
+
+			// if we're retrying then we want the call to block.  Otherwise, just signal
+			// so the client can move on.
+			if err == nil || !retry {
+				close(wait)
+			}
+			return retry, err
+		},
+	}
+	return wait
+}
+
 // Start starts the manager.  It does not block. Instead read from the returned channel to block.
 func (m *manager) Start() (<-chan struct{}, error) {
 
@@ -495,7 +513,7 @@ func (m *manager) execPlugins(config globalSpec,
 
 		// TODO(chungers) ==> temporary
 		switch k.Kind {
-		case "ingress", "enrollment", "gc":
+		case "ingress", "enrollment", "gc", "resource":
 
 			cp, err := m.scope.Controller(r.Handler.String())
 			if err != nil {

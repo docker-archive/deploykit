@@ -34,9 +34,9 @@ func NewLink() *Link {
 
 // Link related labels
 const (
-	LinkLabel        = "infrakit-link"
-	LinkContextLabel = "infrakit-link-context"
-	LinkCreatedLabel = "infrakit-link-created"
+	LinkLabel        = "infrakit_link"
+	LinkContextLabel = "infrakit_link_context"
+	LinkCreatedLabel = "infrakit_link_created"
 )
 
 // NewLinkFromMap constructs a link from data in the map. The link will have missing data
@@ -109,11 +109,19 @@ func (l *Link) Map() map[string]string {
 	}
 }
 
-// WriteMap writes to the target map.  This will overwrite values of same key
-func (l *Link) WriteMap(target map[string]string) {
-	for k, v := range l.Map() {
-		target[k] = v
+// WriteMap writes to the target map.  This will overwrite values of same key. Target cannot be nil.
+func (l *Link) WriteMap(target map[string]string) (merged map[string]string) {
+	merged = target
+	if merged == nil {
+		merged = map[string]string{}
 	}
+	for k, v := range target {
+		merged[k] = v
+	}
+	for k, v := range l.Map() {
+		merged[k] = v
+	}
+	return
 }
 
 // InMap returns true if the link is contained in the map

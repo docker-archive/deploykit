@@ -6,7 +6,7 @@
 Tags:
   link : {{ $joinKey }}  # note that this will be used as the join key in the gc.yml's InstanceKeySelector
   created: {{ now | htmlDate }}
-  user: {{ env `USER` }}
+  user-name: {{ env `USER` }}
   type: vm
 
 Properties:

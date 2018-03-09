@@ -4,77 +4,34 @@ import (
 	"fmt"
 	"sync"
 
-	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi/controller"
-	"github.com/docker/infrakit/pkg/spi/stack"
+	"github.com/docker/infrakit/pkg/spi/event"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/types"
 )
-
-var (
-	log     = logutil.New("module", "controller/internal")
-	debugV  = logutil.V(500)
-	debugV2 = logutil.V(900)
-)
-
-// ControlLoop gives status and means to stop the object
-type ControlLoop interface {
-	Start()
-	Running() bool
-	Stop() error
-}
-
-// Managed is the interface implemented by managed objects within a controller
-type Managed interface {
-	ControlLoop
-
-	Plan(controller.Operation, types.Spec) (*types.Object, *controller.Plan, error)
-	Enforce(types.Spec) (*types.Object, error)
-	Inspect() (*types.Object, error)
-	Free() (*types.Object, error)
-	Terminate() (*types.Object, error)
-}
 
 // Controller implements the pkg/controller/Controller interface and manages a collection of controls
 type Controller struct {
 	alloc   func(types.Spec) (Managed, error)
 	keyfunc func(types.Metadata) string
 	managed map[string]*Managed
-	leader  func() stack.Leadership
+	events  chan<- *event.Event
 	lock    sync.RWMutex
 }
 
 // NewController creates a controller injecting dependencies
-func NewController(l func() stack.Leadership,
-	alloc func(types.Spec) (Managed, error),
+func NewController(alloc func(types.Spec) (Managed, error),
 	keyfunc func(types.Metadata) string) *Controller {
 
 	c := &Controller{
 		keyfunc: keyfunc,
 		alloc:   alloc,
-		leader:  l,
 		managed: map[string]*Managed{},
 	}
 	return c
 }
 
-func (c *Controller) leaderGuard() error {
-	check := c.leader()
-	if check == nil {
-		return fmt.Errorf("cannot determine leader status")
-	}
-
-	is, err := check.IsLeader()
-	if err != nil {
-		return err
-	}
-	if !is {
-		return fmt.Errorf("not a leader")
-	}
-	return nil
-}
-
 func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**Managed, error) {
-
 	log.Debug("getManaged", "search", search, "spec", spec, "V", debugV)
 
 	out := []**Managed{}
@@ -94,12 +51,14 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 
 	if _, has := c.managed[key]; !has {
 		if spec != nil {
-			m, err := c.alloc(*spec)
+
+			m, _, err := c.allocManaged(spec)
 			if err != nil {
 				return nil, err
 			}
 
 			c.managed[key] = &m
+
 		} else {
 			return out, nil
 		}
@@ -108,6 +67,102 @@ func (c *Controller) getManaged(search *types.Metadata, spec *types.Spec) ([]**M
 	out = append(out, &ptr)
 
 	log.Debug("found managed", "search", search, "spec", spec, "found", out)
+	return out, nil
+}
+
+func (c *Controller) allocManaged(spec *types.Spec) (m Managed, pubChan chan *event.Event, err error) {
+	m, err = c.alloc(*spec)
+	if err != nil {
+		return
+	}
+
+	if eventPlugin := m.Events(); eventPlugin != nil {
+		if publisher, is := eventPlugin.(event.Publisher); is {
+
+			pubChan = make(chan *event.Event)
+
+			go func() {
+				// This goroutine will take the events from the Managed (Collection) and
+				// forward it to the channel which it was given by the RPC layer.
+				for {
+					event, ok := <-pubChan
+					if !ok {
+						return
+					}
+					c.events <- event
+				}
+			}()
+			publisher.PublishOn(pubChan)
+		}
+	}
+
+	return
+}
+
+// Metadata exposes any metdata implementations
+func (c *Controller) Metadata() (plugins map[string]metadata.Plugin, err error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	plugins = map[string]metadata.Plugin{}
+
+	for k, m := range c.managed {
+		p := (*m).Metadata()
+		if p != nil {
+			plugins[k] = p
+		}
+	}
+	return plugins, nil
+}
+
+// List implements event.List
+func (c *Controller) List(topic types.Path) ([]string, error) {
+	return c.dynamicTopics(topic)
+}
+
+func (c *Controller) dynamicTopics(topic types.Path) ([]string, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	if len(topic) == 0 || topic.Dot() {
+		out := []string{}
+		for k := range c.managed {
+			out = append(out, k)
+		}
+		return out, nil
+	}
+
+	key := *topic.Index(0)
+	if m, has := c.managed[key]; has {
+		if p := (*m).Events(); p != nil {
+			return p.List(topic.Shift(1))
+		}
+	}
+	return nil, nil
+}
+
+// PublishOn sets the channel to publish on
+func (c *Controller) PublishOn(events chan<- *event.Event) {
+	c.events = events
+}
+
+// Controllers returns a map of managed objects as subcontrollers
+func (c *Controller) Controllers() (map[string]controller.Controller, error) {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	out := map[string]controller.Controller{
+		"": c,
+	}
+	for k, v := range c.managed {
+		out[k] = &Controller{
+			alloc:   c.alloc,
+			keyfunc: c.keyfunc,
+			managed: map[string]*Managed{
+				k: v, // Scope to this as only instance
+			},
+		}
+	}
 	return out, nil
 }
 
@@ -184,16 +239,19 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 				}
 			}
 
-			newManaged, err := c.alloc(spec)
+			// Tell the old to stop
+			(*managed).Stop()
+
+			log.Debug("Currently running managed object", "managed", m[0])
+
+			newManaged, _, err := c.allocManaged(&spec)
 			if err != nil {
 				log.Error("cannot allocate a new managed object", "spec", spec, "err", err)
 				return types.Object{}, err
 			}
 
-			// Tell the old to stop
-			(*managed).Stop()
-
-			log.Debug("Currently running managed object", "managed", m[0])
+			// continuity of context / spec
+			newManaged.SetPrevSpec((*managed).CurrentSpec())
 
 			// swap
 			**m[0] = newManaged
@@ -201,8 +259,9 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 			log.Debug("Swapped running managed object", "managed", m[0])
 		}
 
-		log.Debug("calling enforce", "spec", spec, "m", managed)
+		log.Debug("Calling enforce", "spec", spec, "m", managed, "V", debugV2)
 		o, e := (*managed).Enforce(spec)
+		log.Debug("Called enforce", "spec", spec, "m", managed, "V", debugV2)
 		if o != nil {
 			object = *o
 		}
@@ -226,25 +285,19 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 // metadata can be a tags search.  An object has state, and its original spec can be accessed as well.
 // A nil Metadata will instruct the controller to return all objects under management.
 func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, err error) {
+	defer log.Debug("Describe", "search", search, "V", debugV, "err", err)
 
-	c.lock.Lock()
-	defer c.lock.Unlock()
+	c.lock.RLock()
+	defer c.lock.RUnlock()
 
+	return c.describe(search)
+}
+
+func (c *Controller) describe(search *types.Metadata) (objects []types.Object, err error) {
 	m := []**Managed{}
 	m, err = c.getManaged(search, nil)
-
-	log.Debug("Describe", "search", search, "V", debugV, "managed", m, "err", err)
-
 	if err != nil {
 		return
-	}
-
-	if len(m) == 0 {
-		ss := fmt.Sprintf("%v", search)
-		if search != nil {
-			ss = fmt.Sprintf("%v", *search)
-		}
-		return nil, fmt.Errorf("no managed object found %v", ss)
 	}
 
 	objects = []types.Object{}
@@ -262,14 +315,10 @@ func (c *Controller) Describe(search *types.Metadata) (objects []types.Object, e
 
 // Free tells the controller to pause management of objects matching.  To resume, commit again.
 func (c *Controller) Free(search *types.Metadata) (objects []types.Object, err error) {
-	if err = c.leaderGuard(); err != nil {
-		return
-	}
-
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	described, err := c.Describe(search)
+	described, err := c.describe(search)
 	if err != nil {
 		return nil, err
 	}
@@ -290,25 +339,4 @@ func (c *Controller) Free(search *types.Metadata) (objects []types.Object, err e
 		objects = append(objects, candidate)
 	}
 	return
-}
-
-// ManagedObjects returns a map of managed objects
-func (c *Controller) ManagedObjects() (map[string]controller.Controller, error) {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-
-	out := map[string]controller.Controller{
-		"": c,
-	}
-	for k, v := range c.managed {
-		out[k] = &Controller{
-			alloc:   c.alloc,
-			keyfunc: c.keyfunc,
-			managed: map[string]*Managed{
-				k: v, // Scope to this as only instance
-			},
-			leader: c.leader,
-		}
-	}
-	return out, nil
 }

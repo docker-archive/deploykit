@@ -175,6 +175,9 @@ func startAtPath(listen []string, discoverPath string,
 					if !ok {
 						return
 					}
+					if event.Timestamp.IsZero() {
+						event.Now()
+					}
 					events.Publish(event.Topic.String(), event, 1*time.Second)
 				case <-stop:
 					log.Info("Stopping event relay")
@@ -194,8 +197,17 @@ func startAtPath(listen []string, discoverPath string,
 	router.HandleFunc(rpc_server.URLAPI, info.ShowAPI)
 	router.HandleFunc(rpc_server.URLFunctions, info.ShowTemplateFunctions)
 
+	// Disable this so that clients can connect/subscribe to streams before the topics
+	// actually become available (dynamically added topics)
+	// TODO(chungers) - make this an option somehow
+	skipTopicValidation := true
+
 	intercept := broker.Interceptor{
 		Pre: func(topic string, headers map[string][]string) error {
+			if skipTopicValidation {
+				return nil
+			}
+
 			for _, target := range targets {
 				if v, is := target.(event.Validator); is {
 					if err := v.Validate(types.PathFromString(topic)); err == nil {
@@ -231,6 +243,7 @@ func startAtPath(listen []string, discoverPath string,
 		}
 		l, err := net.Listen("tcp", listen[0])
 		if err != nil {
+			log.Error("error listening tcp", "err", err)
 			return nil, err
 		}
 		listener = l
@@ -255,6 +268,7 @@ func startAtPath(listen []string, discoverPath string,
 		}
 		l, err := net.Listen("unix", discoverPath)
 		if err != nil {
+			log.Error("error listening unix", "err", err)
 			return nil, err
 		}
 		listener = l
@@ -270,7 +284,7 @@ func startAtPath(listen []string, discoverPath string,
 
 		err := gracefulServer.Serve(listener)
 		if err != nil {
-			log.Warn("err", "err", err)
+			log.Error("http server err", "err", err)
 		}
 
 		for _, ch := range stops {

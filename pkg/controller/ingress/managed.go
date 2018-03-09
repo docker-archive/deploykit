@@ -11,9 +11,11 @@ import (
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/group"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
+	"github.com/docker/infrakit/pkg/spi/metadata"
 	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
@@ -112,4 +114,31 @@ func (c *managed) started() bool {
 	defer c.lock.RUnlock()
 
 	return c.process != nil && c.poller != nil
+}
+
+// Metadata returns an optional metadata.Plugin implementation
+func (c *managed) Metadata() metadata.Plugin {
+	return nil
+}
+
+// Events returns an optional events.Plugin implementation
+func (c *managed) Events() event.Plugin {
+	return nil
+}
+
+// CurrentSpec returns the spec this collection is enforcing
+func (c *managed) CurrentSpec() (s types.Spec) {
+	return
+}
+
+// SetPrevSpec sets the spec that a previous version of the collection was managing.
+// This gives the context to the collection so that it is able to remove resources
+// that no longer are needed, for example.
+func (c *managed) SetPrevSpec(s types.Spec) {
+	return
+}
+
+// GetPrevSpec returns the spec the this collection continues from.
+func (c *managed) GetPrevSpec() (s *types.Spec) {
+	return
 }

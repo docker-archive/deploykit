@@ -1,0 +1,49 @@
+kind: resource
+metadata:
+  name: storage
+properties:
+  resources:
+    az1-disk1:
+      plugin: az1/disk
+      labels:
+        az: az1
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB
+    az1-disk2:
+      plugin: az1/disk
+      labels:
+        az: az1
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB
+    az2-disk1:
+      plugin: az2/disk
+      labels:
+        az: az2
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB
+    az2-disk1:
+      plugin: az2/disk
+      labels:
+        az: az2
+        type: storage
+        user: {{ env `USER` }}
+      ObserveInterval: 1s
+      KeySelector: \{\{.Tags.name\}\}
+      Properties:
+        fs: ext4
+        size: 1TB

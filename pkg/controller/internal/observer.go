@@ -2,6 +2,7 @@ package internal
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -9,8 +10,8 @@ import (
 	instance_plugin "github.com/docker/infrakit/pkg/plugin/instance"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/spi/stack"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/imdario/mergo"
 )
 
 // InstanceObserver is an entity that observes an instance plugin
@@ -36,6 +37,9 @@ type InstanceObserver struct {
 	// observations is a channel to receive a slice of current observations
 	observations chan []instance.Description
 
+	// lost is a channel to receive a slice of instances that have been lost in the current sample since last
+	lost chan []instance.Description
+
 	// observe is a function that returns the latest observations
 	observe func() ([]instance.Description, error)
 
@@ -54,8 +58,29 @@ var (
 	minObserveInterval = 1 * time.Second
 )
 
+// Validate validates the receiver with default values provided if some optional fields are not set.
+func (o *InstanceObserver) Validate(defaults *InstanceObserver) error {
+	if err := mergo.Merge(o, defaults); err != nil {
+		return err
+	}
+
+	// critical checks
+	if o.Plugin.Zero() {
+		return fmt.Errorf("missing plugin name")
+	}
+
+	if o.ObserveInterval == 0 {
+		return fmt.Errorf("observe interval not specified")
+	}
+
+	if o.KeySelector == "" {
+		return fmt.Errorf("key selector not specified")
+	}
+	return nil
+}
+
 // Init initializes the observer so that it can be started
-func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadership, retry time.Duration) error {
+func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 
 	o.lock.Lock()
 	defer o.lock.Unlock()
@@ -76,26 +101,19 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 		return instancePlugin.DescribeInstances(o.Labels, true)
 	}
 
-	o.observations = make(chan []instance.Description, 1)
+	o.observations = make(chan []instance.Description, 10)
+	o.lost = make(chan []instance.Description, 10)
+
+	last := []instance.Description{}
 
 	o.ticker = time.Tick(o.ObserveInterval.AtLeast(minObserveInterval))
 	o.poller = PollWithCleanup(
 		// This determines if the action should be taken when time is up
 		func() bool {
-
-			log.Debug("checking before poll", "V", debugV2)
-			isLeader := false
-			if leader != nil {
-				v, err := leader().IsLeader()
-				if err == nil {
-					isLeader = v
-				}
-			}
-
 			o.lock.RLock()
 			defer o.lock.RUnlock()
-			log.Debug("polling", "isLeader", isLeader, "V", debugV2, "freed", o.paused)
-			return isLeader && !o.paused
+			log.Debug("polling", "V", debugV2, "freed", o.paused)
+			return !o.paused
 		},
 		// This does the work
 		func() (err error) {
@@ -105,11 +123,21 @@ func (o *InstanceObserver) Init(scope scope.Scope, leader func() stack.Leadershi
 				return err
 			}
 
+			// send the current observations
 			select {
 			case o.observations <- instances:
 			default:
 			}
 
+			// send the lost instances
+			lost := o.Difference(last, instances)
+
+			select {
+			case o.lost <- []instance.Description(lost):
+			default:
+			}
+
+			last = instances
 			return nil
 		},
 		o.ticker,
@@ -125,7 +153,7 @@ func (o *InstanceObserver) KeyOf(instance instance.Description) (string, error) 
 	return o.extractKey(instance)
 }
 
-// Start starts the observations
+// Start starts the observations. This call is nonblocking.
 func (o *InstanceObserver) Start() {
 	o.lock.Lock()
 	defer o.lock.Unlock()
@@ -149,12 +177,18 @@ func (o *InstanceObserver) Stop() {
 
 	if o.poller != nil {
 		o.poller.Stop()
+		o.poller = nil
 	}
 }
 
 // Observations returns the channel to receive observations.  When stopped, the channel is closed.
 func (o *InstanceObserver) Observations() <-chan []instance.Description {
 	return o.observations
+}
+
+// Lost returns the channel to receive instances that are missing in the current sample from the last.
+func (o *InstanceObserver) Lost() <-chan []instance.Description {
+	return o.lost
 }
 
 // Difference computes the difference before and after samples

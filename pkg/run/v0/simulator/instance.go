@@ -98,7 +98,7 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 		ID:         instance.ID(key),
 		Tags:       spec.Tags,
 		LogicalID:  spec.LogicalID,
-		Properties: types.AnyValueMust(spec),
+		Properties: types.AnyValueMust(spec.Properties),
 	}
 	buff, err := types.AnyValueMust(description).MarshalYAML()
 	if err != nil {

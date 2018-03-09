@@ -1,0 +1,10 @@
+{{/* Input to create instance in the simulator */}}
+{{/* =% instanceProvision `az1/net` %= */}}
+
+Tags:
+  az: az1
+  type: network
+  name: az1-net1
+Properties:
+  cidr: 10.20.100.0/24
+  gateway: 10.20.0.1

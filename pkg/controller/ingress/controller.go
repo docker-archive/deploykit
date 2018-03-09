@@ -15,7 +15,6 @@ import (
 // NewController returns a controller implementation
 func NewController(scope scope.Scope, leader func() stack.Leadership) controller.Controller {
 	return internal.NewController(
-		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
 			return &managed{
@@ -34,7 +33,6 @@ func NewTypedControllers(scope scope.Scope,
 	leader func() stack.Leadership) func() (map[string]controller.Controller, error) {
 
 	return (internal.NewController(
-		leader,
 		// the constructor
 		func(spec types.Spec) (internal.Managed, error) {
 			return newManaged(scope, leader), nil
@@ -43,7 +41,7 @@ func NewTypedControllers(scope scope.Scope,
 		func(metadata types.Metadata) string {
 			return metadata.Name
 		},
-	)).ManagedObjects
+	)).Controllers
 }
 
 // Plan implements internal/Managed

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	//	"os"
 	"path"
 	"sync"
 	"time"
@@ -63,6 +62,7 @@ func New(address string, api spi.InterfaceSpec) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	unvalidatedClient := &client{addr: address, http: httpC, url: u}
 	cl := &handshakingClient{client: unvalidatedClient, iface: api, lock: &sync.Mutex{}}
 	// check handshake
@@ -75,52 +75,88 @@ func New(address string, api spi.InterfaceSpec) (Client, error) {
 	return cl, nil
 }
 
-func parseAddress(address string) (*url.URL, *http.Client, error) {
+var (
+	httpClients     = map[string]*http.Client{}
+	httpClientsLock sync.RWMutex
+)
+
+func cachedClient(address string) *http.Client {
+	httpClientsLock.RLock()
+	defer httpClientsLock.RUnlock()
+	return httpClients[address]
+}
+
+func cacheClient(address string, c *http.Client) {
+	httpClientsLock.Lock()
+	defer httpClientsLock.Unlock()
+	httpClients[address] = c
+}
+
+func parseAddress(address string) (connectURL *url.URL, httpClient *http.Client, err error) {
+
+	httpClient = cachedClient(address)
+
 	if path.Ext(address) == ".listen" {
-		buff, err := ioutil.ReadFile(address)
-		if err != nil {
-			return nil, nil, err
+		buff, e := ioutil.ReadFile(address)
+		if e != nil {
+			err = e
+			return
 		}
 		address = string(buff)
 	}
 
-	u, err := url.Parse(address)
+	connectURL, err = url.Parse(address)
 	if err != nil {
-		return nil, nil, err
+		return
 	}
-	switch u.Scheme {
+	switch connectURL.Scheme {
+
 	case "", "unix", "file":
 		// Socket case
-		u.Scheme = "http"
-		u.Host = "h"
-		u.Path = "" // clear it since it's a file path and we are using it to connect.
-		return u, &http.Client{
-			Timeout: local.ClientTimeout(),
-			Transport: &http.Transport{
-				// TODO(chungers) - fix this deprecation
-				Dial: func(proto, addr string) (conn net.Conn, err error) {
-					return net.Dial("unix", address)
-				},
-				MaxIdleConns:          1,
-				IdleConnTimeout:       1 * time.Second,
-				TLSHandshakeTimeout:   10 * time.Second,
-				ExpectContinueTimeout: 1 * time.Second,
-			}}, nil
-	case "tcp":
-		u.Scheme = "http"
-		fallthrough
-	case "http", "https":
-		transport := &http.Transport{
-			Dial: (&net.Dialer{
+		connectURL.Scheme = "http"
+		connectURL.Host = "h"
+		connectURL.Path = "" // clear it since it's a file path and we are using it to connect.
+
+		if httpClient == nil {
+			httpClient = &http.Client{
 				Timeout: local.ClientTimeout(),
-			}).Dial,
-			TLSHandshakeTimeout: local.ClientTimeout(),
+				Transport: &http.Transport{
+					// TODO(chungers) - fix this deprecation
+					Dial: func(proto, addr string) (conn net.Conn, err error) {
+						return net.Dial("unix", address)
+					},
+					MaxIdleConns:          10,
+					IdleConnTimeout:       10 * time.Second,
+					TLSHandshakeTimeout:   10 * time.Second,
+					ExpectContinueTimeout: 10 * time.Second,
+				},
+			}
+			cacheClient(address, httpClient)
 		}
-		return u, &http.Client{Transport: transport}, nil
+
+	case "tcp":
+		connectURL.Scheme = "http"
+		fallthrough
+
+	case "http", "https":
+
+		if httpClient == nil {
+			transport := &http.Transport{
+				Dial: (&net.Dialer{
+					Timeout: local.ClientTimeout(),
+				}).Dial,
+				TLSHandshakeTimeout: local.ClientTimeout(),
+			}
+			httpClient = &http.Client{Transport: transport}
+			cacheClient(address, httpClient)
+		}
 
 	default:
+		err = fmt.Errorf("invalid address %v", address)
+		return
 	}
-	return nil, nil, fmt.Errorf("invalid address %v", address)
+
+	return
 }
 
 // Hello implements the Handshaker interface

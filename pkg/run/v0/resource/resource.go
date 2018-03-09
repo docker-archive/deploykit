@@ -1,9 +1,7 @@
-package enrollment
+package resource
 
 import (
-	"strconv"
-
-	"github.com/docker/infrakit/pkg/controller/enrollment"
+	"github.com/docker/infrakit/pkg/controller/resource"
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
@@ -11,7 +9,6 @@ import (
 	"github.com/docker/infrakit/pkg/rpc/client"
 	manager_rpc "github.com/docker/infrakit/pkg/rpc/manager"
 	"github.com/docker/infrakit/pkg/run"
-	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
 	"github.com/docker/infrakit/pkg/spi/stack"
@@ -20,36 +17,16 @@ import (
 
 const (
 	// Kind is the canonical name of the plugin for starting up, etc.
-	Kind = "enrollment"
+	Kind = "resource"
 )
 
 var (
-	// EnvSyncInterval sets the sync interval for all
-	// enrollment controller instances in the process
-	EnvSyncInterval = "INFRAKIT_ENROLLMENT_SYNC_INTERVAL"
+	log = logutil.New("module", "run/v0/resource")
 
-	// EnvDestroyOnTerminate sets the destroyOnTerminate option
-	EnvDestroyOnTerminate = "INFRAKIT_ENROLLMENT_DESTROY_ON_TERMINATE"
-
-	log = logutil.New("module", "run/v0/enrollment")
-
-	defaultOptions = enrollment.DefaultOptions
+	defaultOptions = resource.DefaultOptions
 )
 
 func init() {
-
-	// We let the user set some environment variables to override
-	// the default values.  These default options are then overridden
-	// after the plugin started if the user provides options in the spec
-	// to override them.
-	if d := types.MustParseDuration(local.Getenv(EnvSyncInterval, "0s")); d > 0 {
-		defaultOptions.SyncInterval = d
-	}
-	if v := local.Getenv(EnvDestroyOnTerminate, ""); v != "" {
-		if b, err := strconv.ParseBool(v); err == nil {
-			defaultOptions.DestroyOnTerminate = b
-		}
-	}
 
 	inproc.Register(Kind, Run, defaultOptions)
 }
@@ -89,21 +66,26 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	log.Info("Decoded input", "config", options)
 
+	transport.Name = name
+
+	resource := resource.NewComponents(scope, options)
+
 	leader := func() stack.Leadership {
 		return leadership(scope.Plugins)
 	}
 
-	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Controller: func() (map[string]controller.Controller, error) {
-			m := map[string]controller.Controller{}
-			if all, err := enrollment.NewTypedControllers(scope, options)(); err == nil {
-				for k, p := range all {
-					m[k] = controller.Singleton(p, leader)
+			singletons := map[string]controller.Controller{}
+			if controllers, err := resource.Controllers(); err == nil {
+				for k, c := range controllers {
+					singletons[k] = controller.Singleton(c, leader)
 				}
 			}
-			return m, nil
+			return singletons, nil
 		},
+		run.Metadata: resource.Metadata,
+		run.Event:    resource.Events,
 	}
 
 	return

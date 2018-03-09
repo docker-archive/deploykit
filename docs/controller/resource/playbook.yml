@@ -1,0 +1,8 @@
+
+# Start infrakit
+start : start.sh
+
+add-az1-net1: add-az1-net1.yml
+add-az2-net1: add-az2-net1.yml
+
+add-storage: add-storage.yml

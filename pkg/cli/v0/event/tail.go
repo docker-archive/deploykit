@@ -126,7 +126,23 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 					log.Info("Server disconnected.")
 					break loop
 				}
-				buff, err := engine.Render(evt)
+
+				// view of the Event
+				type ext struct {
+					*event.Event
+					Properties interface{} // So that golang template can operate via . notation
+				}
+
+				view := &ext{Event: evt}
+				if err := evt.Data.Decode(&view.Properties); err != nil {
+					if view.Error != nil {
+						view.Error = errors([]error{view.Error, err})
+					} else {
+						view.Error = err
+					}
+				}
+
+				buff, err := engine.Render(view)
 				if err != nil {
 					log.Warn("error rendering view", "err=", err)
 				} else {
@@ -138,4 +154,14 @@ func Tail(name string, services *cli.Services) *cobra.Command {
 		return nil
 	}
 	return tail
+}
+
+type errors []error
+
+func (errs errors) Error() string {
+	l := []string{}
+	for _, e := range errs {
+		l = append(l, e.Error())
+	}
+	return strings.Join(l, ";")
 }

@@ -11,6 +11,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/run/v0/image"
 	_ "github.com/docker/infrakit/pkg/run/v0/ingress"
 	_ "github.com/docker/infrakit/pkg/run/v0/manager"
+	_ "github.com/docker/infrakit/pkg/run/v0/resource"
 	_ "github.com/docker/infrakit/pkg/run/v0/selector"
 	_ "github.com/docker/infrakit/pkg/run/v0/simulator"
 	_ "github.com/docker/infrakit/pkg/run/v0/swarm"

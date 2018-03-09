@@ -50,10 +50,19 @@ func TestPath(t *testing.T) {
 	require.True(t, PathFromString("a/b").Equal(PathFromString("a/b")))
 	require.False(t, PathFromString("a/b/c/d").Equal(PathFromString("b/c/d")))
 
-	list := PathsFromStrings("a/b/c/d", "x/y/z", "a/b/e/f", "k/z/y/1")
+	require.True(t, PathFromString("a/b").Less(PathFromString("a/b/c")))
+
+	list := PathsFromStrings("a/b/c/d", "x/y/z", "a/b/e/f", "k/z/y/1", "a/b")
 	list.Sort()
-	list2 := PathsFromStrings("a/b/c/d", "a/b/e/f", "k/z/y/1", "x/y/z")
+	list2 := PathsFromStrings("a/b", "a/b/c/d", "a/b/e/f", "k/z/y/1", "x/y/z")
 	require.Equal(t, list, list2)
+	require.Equal(t, list, PathsFromStrings(
+		"a/b",
+		"a/b/c/d",
+		"a/b/e/f",
+		"k/z/y/1",
+		"x/y/z",
+	))
 
 	require.NotEqual(t, PathFromString("/a/b/c/d/"), PathFromString("a/b/c/d/.").Clean())
 	require.Equal(t, PathFromString("/a/x"), PathFromString("/a/b/../x").Clean())
