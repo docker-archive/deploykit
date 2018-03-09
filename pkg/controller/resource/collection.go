@@ -39,6 +39,8 @@ type collection struct {
 
 	resources resources
 
+	deleted map[string]*internal.InstanceAccess
+
 	watch    *Watch
 	watching map[string]Watchers
 	cancel   func()
@@ -87,6 +89,7 @@ func newCollection(scope scope.Scope, options resource.Options) (internal.Manage
 		watch:      &Watch{},
 		resources:  resources{},
 		watching:   map[string]Watchers{},
+		deleted:    map[string]*internal.InstanceAccess{},
 	}
 	// set the behaviors
 	base.StartFunc = c.run
@@ -108,7 +111,14 @@ func (c *collection) run(ctx context.Context) {
 	}
 
 	dependencyComplete := make(chan *observation, len(c.properties.Resources))
-	accessors := map[string]*internal.InstanceAccess(c.properties.Resources)
+	accessors := map[string]*internal.InstanceAccess{}
+
+	for n, a := range c.properties.Resources {
+		accessors[n] = a
+	}
+	for n, a := range c.deleted {
+		accessors[n] = a
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
@@ -131,11 +141,8 @@ func (c *collection) run(ctx context.Context) {
 
 	for k, a := range accessors {
 
-		name := k
-		accessor := a
-
-		log.Debug("Set up events from instance accessor", "name", name, "V", debugV)
-		go func() {
+		log.Debug("Set up events from instance accessor", "name", k, "V", debugV)
+		go func(name string, accessor *internal.InstanceAccess) {
 
 			for {
 				select {
@@ -144,20 +151,24 @@ func (c *collection) run(ctx context.Context) {
 						log.Debug("found observations done", "name", name, "V", debugV2)
 						return
 					}
-					foundInstances <- &observation{name: name, instances: list}
-
+					if len(list) > 0 {
+						foundInstances <- &observation{name: name, instances: list}
+						log.Debug("accessor found instances", "name", name, "count", len(list), "V", debugV)
+					}
 				case list, ok := <-accessor.Lost():
 					if !ok {
 						log.Debug("lost events done", "name", name, "V", debugV2)
 						return
 					}
-					lostInstances <- &observation{name: name, instances: list}
+					if len(list) > 0 {
+						lostInstances <- &observation{name: name, instances: list}
+						log.Debug("accessor lost instances", "name", name, "count", len(list), "V", debugV)
+					}
 				}
 			}
-		}()
+		}(k, a)
 
-		// start
-		accessor.Start()
+		a.Start()
 		log.Debug("accessor started", "key", k)
 	}
 
@@ -220,20 +231,9 @@ func (c *collection) run(ctx context.Context) {
 					// correspond to anything.
 					// The correct approach would be to use the *previous* version of the spec
 					if accessor == nil {
-						// try the last version
-						prevProperties := DefaultProperties
-						if err := c.GetPrevSpec().Properties.Decode(&prevProperties); err == nil {
-							log.Debug("Looking for accessor in previous version",
-								"key", item.Key, "properties", prevProperties)
-
-							accessor = prevProperties.Resources[item.Key]
-							if err := accessor.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second)); err != nil {
-								log.Error("cannot initialize accessor from previous version",
-									"key", item.Key, "err", err)
-
-								accessor = nil
-							}
-
+						found, has := c.deleted[item.Key]
+						if has {
+							accessor = found
 						}
 					}
 
@@ -270,9 +270,6 @@ func (c *collection) run(ctx context.Context) {
 								Message: "destroyed resource",
 							}.Init()
 						}
-
-						// now stop the accessor
-						accessor.Stop()
 					}
 				}
 
@@ -452,17 +449,38 @@ func (c *collection) stop() error {
 		accessor.Stop()
 	}
 
+	for k, accessor := range c.deleted {
+		log.Debug("Stopping", "name", k, "V", debugV)
+		accessor.Stop()
+	}
+
 	c.model.Stop()
 	return nil
 }
 
-func (c *collection) updateSpec(spec types.Spec) (err error) {
+func (c *collection) configureAccessor(spec types.Spec, name string, access *internal.InstanceAccess) error {
+	if access.Labels == nil {
+		access.Labels = map[string]string{}
+	}
+
+	// inject a filter specifically for *this* resource
+	access.Labels[ResourceCollectionLabel] = spec.Metadata.Name
+	access.Labels[ResourceNameLabel] = name
+
+	err := access.InstanceObserver.Validate(DefaultAccessProperties)
+	if err != nil {
+		return err
+	}
+
+	return access.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second))
+}
+
+func (c *collection) updateSpec(spec types.Spec, prev *types.Spec) (err error) {
 
 	defer log.Debug("updateSpec", "spec", spec, "err", err)
 
 	// parse input, then select the model to use
 	properties := DefaultProperties
-
 	err = spec.Properties.Decode(&properties)
 	if err != nil {
 		return
@@ -473,27 +491,54 @@ func (c *collection) updateSpec(spec types.Spec) (err error) {
 		return
 	}
 
-	// init the instance accessors
 	// NOTE - we are using one client per instance accessor.  This is not the most efficient
 	// if there are resources sharing the same backends.  We assume there are only a small number
 	// of resources in a collection.  For large pools of the same thing, we will implement a dedicated
 	// pool controller.
-	for _, access := range properties.Resources {
+	for name, access := range properties.Resources {
 
-		err = access.InstanceObserver.Validate(DefaultAccessProperties)
+		err = c.configureAccessor(spec, name, access)
 		if err != nil {
 			return err
 		}
-
-		err = access.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second))
-		if err != nil {
-			return err
-		}
+		log.Debug("Initialized INCLUDED accessor", "name", name, "spec", spec, "access", access, "V", debugV2)
 	}
 
 	log.Debug("Process watches / dependencies")
 	watch, watching := processWatches(properties)
 	log.Debug("watch/watching", "watch", watch, "watching", watching)
+
+	if prev != nil {
+
+		prevProperties := DefaultProperties
+		err = prev.Properties.Decode(&prevProperties)
+		if err != nil {
+			return
+		}
+
+		deleted := map[string]*internal.InstanceAccess{}
+
+		// For each in the previous spec that's not in the new spec, we need to start up the observation
+		// so that we can detect whether there are real instances that needs to be terminated to match
+		// the deletion in the new spec.
+		for name, access := range prevProperties.Resources {
+
+			if _, has := properties.Resources[name]; !has {
+
+				// this is no longer in the newer version of the spec, so it's a deletion.
+				// we need to have this still.
+
+				if err := c.configureAccessor(*prev, name, access); err != nil {
+					return err
+				}
+
+				deleted[name] = access
+				log.Debug("Initialize DELETED accessor", "name", name, "spec", spec, "access", access, "V", debugV2)
+			}
+		}
+
+		c.deleted = deleted
+	}
 
 	// build the fsm model
 	var model *Model

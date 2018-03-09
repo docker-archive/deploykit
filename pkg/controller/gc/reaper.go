@@ -94,7 +94,7 @@ var (
 	}
 )
 
-func (r *reaper) updateSpec(spec types.Spec) error {
+func (r *reaper) updateSpec(spec types.Spec, prev *types.Spec) error {
 	// parse input, then select the model to use
 	properties := gc.Properties{}
 

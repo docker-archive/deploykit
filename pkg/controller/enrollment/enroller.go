@@ -89,8 +89,8 @@ func (l *enroller) SetPrevSpec(s types.Spec) {
 }
 
 // GetPrevSpec returns the spec the this collection continues from.
-func (l *enroller) GetPrevSpec() (s types.Spec) {
-	return
+func (l *enroller) GetPrevSpec() (s *types.Spec) {
+	return nil
 }
 
 // Metadata returns an optional metadata.Plugin implementation

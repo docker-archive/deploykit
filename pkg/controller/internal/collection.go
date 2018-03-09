@@ -50,7 +50,7 @@ type Collection struct {
 
 	// UpdateSpecFunc is called when a new spec is posted.  This will be executed
 	// with exclusive lock on the collection.
-	UpdateSpecFunc func(types.Spec) error `json:"-"`
+	UpdateSpecFunc func(cur types.Spec, prev *types.Spec) error `json:"-"`
 
 	// PauseFunc is called when the controller tries to pause.
 	PauseFunc func(bool) `json:"-"`
@@ -64,7 +64,7 @@ type Collection struct {
 
 	types.Spec
 
-	previous types.Spec
+	previous *types.Spec
 
 	items map[string]*Item // read/writes of this will not be synchronized by the lock.
 	stop  chan struct{}
@@ -318,13 +318,14 @@ func (c *Collection) CurrentSpec() (s types.Spec) {
 // that no longer are needed, for example.
 func (c *Collection) SetPrevSpec(s types.Spec) {
 	c.writeTxn(func() error {
-		c.previous = s
+		copy := s
+		c.previous = &copy
 		return nil
 	})
 }
 
 // GetPrevSpec returns the spec the this collection continues from.
-func (c *Collection) GetPrevSpec() (s types.Spec) {
+func (c *Collection) GetPrevSpec() (s *types.Spec) {
 	c.readTxn(func() error {
 		s = c.previous
 		return nil
@@ -489,7 +490,7 @@ func (c *Collection) Enforce(spec types.Spec) (object *types.Object, err error) 
 	if err := c.writeTxn(func() error {
 
 		if c.UpdateSpecFunc != nil {
-			if err := c.UpdateSpecFunc(spec); err != nil {
+			if err := c.UpdateSpecFunc(spec, c.previous); err != nil {
 				log.Error("updating spec", "err", err)
 				return err
 			}

@@ -11,6 +11,7 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
+	"github.com/imdario/mergo"
 )
 
 // InstanceObserver is an entity that observes an instance plugin
@@ -59,24 +60,19 @@ var (
 
 // Validate validates the receiver with default values provided if some optional fields are not set.
 func (o *InstanceObserver) Validate(defaults *InstanceObserver) error {
+	if err := mergo.Merge(o, defaults); err != nil {
+		return err
+	}
+
+	// critical checks
 	if o.Plugin.Zero() {
 		return fmt.Errorf("missing plugin name")
 	}
 
-	if o.Labels == nil {
-		o.Labels = defaults.Labels
-	}
-
-	if o.ObserveInterval == 0 {
-		o.ObserveInterval = defaults.ObserveInterval
-	}
 	if o.ObserveInterval == 0 {
 		return fmt.Errorf("observe interval not specified")
 	}
 
-	if o.KeySelector == "" {
-		o.KeySelector = defaults.KeySelector
-	}
 	if o.KeySelector == "" {
 		return fmt.Errorf("key selector not specified")
 	}
@@ -135,6 +131,7 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 
 			// send the lost instances
 			lost := o.Difference(last, instances)
+
 			select {
 			case o.lost <- []instance.Description(lost):
 			default:

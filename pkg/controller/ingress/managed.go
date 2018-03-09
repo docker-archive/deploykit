@@ -139,6 +139,6 @@ func (c *managed) SetPrevSpec(s types.Spec) {
 }
 
 // GetPrevSpec returns the spec the this collection continues from.
-func (c *managed) GetPrevSpec() (s types.Spec) {
+func (c *managed) GetPrevSpec() (s *types.Spec) {
 	return
 }

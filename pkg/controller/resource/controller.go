@@ -15,7 +15,7 @@ import (
 
 var (
 	log     = logutil.New("module", "controller/resource")
-	debugV  = logutil.V(200)
+	debugV  = logutil.V(500)
 	debugV2 = logutil.V(1000)
 
 	// DefaultOptions return an Options with default values filled in.

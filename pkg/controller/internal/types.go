@@ -27,7 +27,7 @@ type Managed interface {
 
 	CurrentSpec() types.Spec
 	SetPrevSpec(types.Spec)
-	GetPrevSpec() types.Spec
+	GetPrevSpec() *types.Spec // optional since the first one will not have it set
 
 	Metadata() metadata.Plugin
 	Events() event.Plugin
