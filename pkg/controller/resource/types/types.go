@@ -34,7 +34,7 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	}
 
 	dep := depends.Runnables{}
-	for _, access := range properties.Resources {
+	for _, access := range properties {
 		dep = append(dep,
 			depends.AsRunnable(
 				types.Spec{
@@ -49,10 +49,7 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 }
 
 // Properties is the schema of the configuration in the types.Spec.Properties
-type Properties struct {
-	Resources       map[string]*internal.InstanceAccess
-	ModelProperties `json:",inline" yaml:",inline"`
-}
+type Properties map[string]internal.InstanceAccess
 
 // ModelProperties contain fsm tuning parameters
 type ModelProperties struct {
@@ -73,20 +70,29 @@ type Options struct {
 	// PluginRetryInterval is the interval for retrying to connect to the plugins
 	PluginRetryInterval types.Duration
 
-	// LostBufferSize is the size of the buffered chanel for lost []instance.Description
-	LostBufferSize int
+	// MinChannelBufferSize is the min size of the buffered chanels
+	MinChannelBufferSize int
 
-	// FoundBufferSize is the size of the buffered chanel for lost []instance.Description
-	FoundBufferSize int
+	// MinWaitBeforeProvision is the number of ticks before provision of missing resources begins
+	MinWaitBeforeProvision fsm.Tick
+
+	// ModelProperties are the config parameters for the workflow model
+	ModelProperties `json:",inline" yaml:",inline"`
 }
 
 // Validate validates the controller's options
 func (p Options) Validate(ctx context.Context) error {
-	if p.LostBufferSize == 0 {
-		return fmt.Errorf("lost buffer size cannot be 0")
+	if p.MinChannelBufferSize == 0 {
+		return fmt.Errorf("min channel buffer size cannot be 0")
 	}
-	if p.FoundBufferSize == 0 {
-		return fmt.Errorf("found buffer size cannot be 0")
+	if p.MinWaitBeforeProvision == 0 {
+		return fmt.Errorf("min wait before provision cannot be 0")
+	}
+	if p.ChannelBufferSize < p.MinChannelBufferSize {
+		return fmt.Errorf("channel buffer size can't be less than %v", p.MinChannelBufferSize)
+	}
+	if p.WaitBeforeProvision < p.MinWaitBeforeProvision {
+		return fmt.Errorf("wait before provision can't be less than %v", p.MinWaitBeforeProvision)
 	}
 	return nil
 }

@@ -1,0 +1,26 @@
+{{/* =% text %= */}}
+kind: resource
+metadata:
+  name: chain
+properties:
+  az1-net1:
+    plugin: az1/net
+    labels:
+      az: az1
+      type: network
+    ObserveInterval: 1s                               # optional - specified here to control polling interval
+    KeySelector: \{\{.Tags.infrakit_instance\}\}      # optional specified here to control key extraction
+    Properties:
+      cidr: 10.20.100.0/24
+      gateway: 10.20.0.1
+  az1-disk0:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-net1/ID` }}
+      depname: {{ depend `az1-net1/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 1TB

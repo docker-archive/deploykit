@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
@@ -11,21 +10,8 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
-)
-
-var (
-	// DefaultProperties is the default properties for the controller
-	DefaultProperties = resource.Properties{
-		ModelProperties: defaultModelProperties,
-	}
-
-	// DefaultAccessProperties specifies some default parameters
-	DefaultAccessProperties = &internal.InstanceObserver{
-		ObserveInterval: types.Duration(1 * time.Second),
-		KeySelector:     template.EscapeString(`{{.Tags.infrakit_resource_name}}`),
-	}
+	"github.com/imdario/mergo"
 )
 
 type resources map[string]instance.Description
@@ -33,9 +19,9 @@ type resources map[string]instance.Description
 type collection struct {
 	*internal.Collection
 
-	properties *resource.Properties
-	options    resource.Options
-	model      *Model
+	accessors map[string]*internal.InstanceAccess
+	options   resource.Options
+	model     *Model
 
 	resources resources
 
@@ -68,6 +54,10 @@ var (
 
 func newCollection(scope scope.Scope, options resource.Options) (internal.Managed, error) {
 
+	if err := mergo.Merge(&options, DefaultOptions); err != nil {
+		return nil, err
+	}
+
 	if err := options.Validate(context.Background()); err != nil {
 		return nil, err
 	}
@@ -99,7 +89,118 @@ func newCollection(scope scope.Scope, options resource.Options) (internal.Manage
 	return c, nil
 }
 
+func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err error) {
+
+	prev := spec
+	if previous != nil {
+		prev = *previous
+	}
+
+	log.Debug("updateSpec", "spec", spec, "prev", prev)
+
+	// parse input, then select the model to use
+	properties := resource.Properties{}
+	err = spec.Properties.Decode(&properties)
+	if err != nil {
+		return
+	}
+
+	prevProperties := resource.Properties{}
+	err = prev.Properties.Decode(&prevProperties)
+	if err != nil {
+		return
+	}
+
+	options := c.options // the plugin options at initialization are the defaults
+	err = spec.Options.Decode(&options)
+	if err != nil {
+		return
+	}
+
+	ctx := context.Background()
+	if err = properties.Validate(ctx); err != nil {
+		return
+	}
+
+	if err = options.Validate(ctx); err != nil {
+		return
+	}
+
+	log.Debug("Begin processing", "properties", properties, "previous", prevProperties, "options", options, "V", debugV2)
+
+	// NOTE - we are using one client per instance accessor.  This is not the most efficient
+	// if there are resources sharing the same backends.  We assume there are only a small number
+	// of resources in a collection.  For large pools of the same thing, we will implement a dedicated
+	// pool controller.
+
+	accessors := map[string]*internal.InstanceAccess{}
+
+	for name, access := range properties {
+
+		copy := access
+
+		err = c.configureAccessor(spec, name, &copy)
+		if err != nil {
+			return err
+		}
+
+		accessors[name] = &copy
+
+		log.Debug("Initialized INCLUDED accessor", "name", name, "spec", spec, "access", accessors[name], "V", debugV)
+	}
+
+	log.Debug("Process watches / dependencies")
+	watch, watching := processWatches(properties)
+	log.Debug("watch/watching", "watch", watch, "watching", watching)
+
+	// Handle deletion
+
+	deleted := map[string]*internal.InstanceAccess{}
+
+	// For each in the previous spec that's not in the new spec, we need to start up the observation
+	// so that we can detect whether there are real instances that needs to be terminated to match
+	// the deletion in the new spec.
+	for name, access := range prevProperties {
+
+		if _, has := properties[name]; !has {
+
+			// this is no longer in the newer version of the spec, so it's a deletion.
+			// we need to have this still.
+
+			copy := access
+
+			if err := c.configureAccessor(prev, name, &copy); err != nil {
+				return err
+			}
+
+			deleted[name] = &copy
+			log.Debug("Initialize DELETED accessor", "name", name, "spec", spec, "access", deleted[name], "V", debugV)
+		}
+	}
+	c.deleted = deleted
+
+	// build the fsm model
+	var model *Model
+	model, err = BuildModel(properties, options)
+	if err != nil {
+		return
+	}
+
+	c.accessors = accessors
+	c.model = model
+	c.options = options
+
+	c.watch = watch
+	c.watching = watching
+
+	return
+}
+
 func (c *collection) run(ctx context.Context) {
+
+	for k, v := range c.accessors {
+		log.Debug("Running with accessors", "key", k, "accessor", v, "V", debugV2)
+	}
 
 	// Start the model
 	c.model.Start()
@@ -110,10 +211,10 @@ func (c *collection) run(ctx context.Context) {
 		instances []instance.Description
 	}
 
-	dependencyComplete := make(chan *observation, len(c.properties.Resources))
+	dependencyComplete := make(chan *observation, len(c.accessors))
 	accessors := map[string]*internal.InstanceAccess{}
 
-	for n, a := range c.properties.Resources {
+	for n, a := range c.accessors {
 		accessors[n] = a
 	}
 	for n, a := range c.deleted {
@@ -136,8 +237,8 @@ func (c *collection) run(ctx context.Context) {
 
 	// Start all the instance accessors and wire up the observations.
 
-	lostInstances := make(chan *observation, c.properties.ChannelBufferSize)  // ch to aggregate all lost observations
-	foundInstances := make(chan *observation, c.properties.ChannelBufferSize) // ch to aggregate all found observations
+	lostInstances := make(chan *observation, c.options.ChannelBufferSize)  // ch to aggregate all lost observations
+	foundInstances := make(chan *observation, c.options.ChannelBufferSize) // ch to aggregate all found observations
 
 	for k, a := range accessors {
 
@@ -153,7 +254,7 @@ func (c *collection) run(ctx context.Context) {
 					}
 					if len(list) > 0 {
 						foundInstances <- &observation{name: name, instances: list}
-						log.Debug("accessor found instances", "name", name, "count", len(list), "V", debugV)
+						log.Debug("accessor found instances", "name", name, "count", len(list), "V", debugV2)
 					}
 				case list, ok := <-accessor.Lost():
 					if !ok {
@@ -162,7 +263,7 @@ func (c *collection) run(ctx context.Context) {
 					}
 					if len(list) > 0 {
 						lostInstances <- &observation{name: name, instances: list}
-						log.Debug("accessor lost instances", "name", name, "count", len(list), "V", debugV)
+						log.Debug("accessor lost instances", "name", name, "count", len(list), "V", debugV2)
 					}
 				}
 			}
@@ -223,7 +324,7 @@ func (c *collection) run(ctx context.Context) {
 				item := c.Collection.GetByFSM(f)
 				if item != nil {
 
-					accessor := c.properties.Resources[item.Key]
+					accessor := c.accessors[item.Key]
 					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
 
 					// !!!! This actually is *always* nil in the case where the accessor
@@ -280,7 +381,8 @@ func (c *collection) run(ctx context.Context) {
 
 				item := c.Collection.GetByFSM(f)
 				if item != nil {
-					accessor := c.properties.Resources[item.Key]
+					accessor := c.accessors[item.Key]
+
 					spec, err := c.populateDependencies(item.Key, accessor.Spec)
 					if err != nil {
 
@@ -293,37 +395,48 @@ func (c *collection) run(ctx context.Context) {
 						continue
 					}
 
-					instanceID, err := accessor.Provision(spec)
-					if err != nil {
+					func() {
+						defer func() {
+							e := recover()
+							if e != nil {
+								log.Error("Recovered from error while provisioning", "err", e,
+									"accessor", accessor,
+									"spec", spec, "item", item)
+							}
+						}()
+						instanceID, err := accessor.Provision(spec)
+						if err != nil {
 
-						log.Error("Cannot provision", "err", err)
-						item.State.Signal(provisionError)
+							log.Error("Cannot provision", "err", err)
+							item.State.Signal(provisionError)
 
-						c.EventCh() <- event.Event{
-							Topic:   c.Topic(TopicProvisionErr),
-							Type:    event.Type("ProvisionErr"),
-							ID:      c.EventID(item.Key),
-							Message: "error when provision",
-						}.Init().WithError(err)
+							c.EventCh() <- event.Event{
+								Topic:   c.Topic(TopicProvisionErr),
+								Type:    event.Type("ProvisionErr"),
+								ID:      c.EventID(item.Key),
+								Message: "error when provision",
+							}.Init().WithError(err)
 
-					} else {
+						} else {
 
-						id := ""
-						if instanceID != nil {
-							id = string(*instanceID)
+							id := ""
+							if instanceID != nil {
+								id = string(*instanceID)
+							}
+
+							log.Info("Provisioned", "id", id, "spec", spec)
+
+							/// don't do anything. next sample will make sure it moves to ready
+
+							c.EventCh() <- event.Event{
+								Topic:   c.Topic(TopicProvision),
+								Type:    event.Type("Provision"),
+								ID:      c.EventID(item.Key),
+								Message: "provisioning resource",
+							}.Init().WithDataMust(spec)
 						}
 
-						log.Info("Provisioned", "id", id, "spec", spec)
-
-						/// don't do anything. next sample will make sure it moves to ready
-
-						c.EventCh() <- event.Event{
-							Topic:   c.Topic(TopicProvision),
-							Type:    event.Type("Provision"),
-							ID:      c.EventID(item.Key),
-							Message: "provisioning resource",
-						}.Init().WithDataMust(spec)
-					}
+					}()
 				}
 
 			case haveAllData, ok := <-dependencyComplete:
@@ -431,7 +544,7 @@ func (c *collection) run(ctx context.Context) {
 
 	// Seed the initial fsm instances for each named resource in the config
 	// For each accessor / resource we create one fsm
-	for k := range c.properties.Resources {
+	for k := range c.accessors {
 		log.Debug("requesting", "key", k)
 		f := c.model.Requested()
 		c.Put(k, f, c.model.Spec(), nil)
@@ -444,17 +557,23 @@ func (c *collection) run(ctx context.Context) {
 func (c *collection) stop() error {
 	log.Info("stop")
 
-	for k, accessor := range c.properties.Resources {
-		log.Debug("Stopping", "name", k, "V", debugV)
-		accessor.Stop()
-	}
+	if c.model != nil {
 
-	for k, accessor := range c.deleted {
-		log.Debug("Stopping", "name", k, "V", debugV)
-		accessor.Stop()
-	}
+		c.cancel()
 
-	c.model.Stop()
+		for k, accessor := range c.accessors {
+			log.Debug("Stopping", "name", k, "V", debugV)
+			accessor.Stop()
+		}
+
+		for k, accessor := range c.deleted {
+			log.Debug("Stopping", "name", k, "V", debugV)
+			accessor.Stop()
+		}
+
+		c.model.Stop()
+		c.model = nil
+	}
 	return nil
 }
 
@@ -464,8 +583,8 @@ func (c *collection) configureAccessor(spec types.Spec, name string, access *int
 	}
 
 	// inject a filter specifically for *this* resource
-	access.Labels[ResourceCollectionLabel] = spec.Metadata.Name
-	access.Labels[ResourceNameLabel] = name
+	access.Labels[internal.CollectionLabel] = spec.Metadata.Name
+	access.Labels[internal.InstanceLabel] = name
 
 	err := access.InstanceObserver.Validate(DefaultAccessProperties)
 	if err != nil {
@@ -475,82 +594,13 @@ func (c *collection) configureAccessor(spec types.Spec, name string, access *int
 	return access.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second))
 }
 
-func (c *collection) updateSpec(spec types.Spec, prev *types.Spec) (err error) {
-
-	defer log.Debug("updateSpec", "spec", spec, "err", err)
-
-	// parse input, then select the model to use
-	properties := DefaultProperties
-	err = spec.Properties.Decode(&properties)
-	if err != nil {
+func keyFromPath(path types.Path) (key string, err error) {
+	k := path.Clean().Index(0)
+	if k == nil {
+		err = fmt.Errorf("no key %v", path)
 		return
 	}
-
-	ctx := context.Background()
-	if err = properties.Validate(ctx); err != nil {
-		return
-	}
-
-	// NOTE - we are using one client per instance accessor.  This is not the most efficient
-	// if there are resources sharing the same backends.  We assume there are only a small number
-	// of resources in a collection.  For large pools of the same thing, we will implement a dedicated
-	// pool controller.
-	for name, access := range properties.Resources {
-
-		err = c.configureAccessor(spec, name, access)
-		if err != nil {
-			return err
-		}
-		log.Debug("Initialized INCLUDED accessor", "name", name, "spec", spec, "access", access, "V", debugV2)
-	}
-
-	log.Debug("Process watches / dependencies")
-	watch, watching := processWatches(properties)
-	log.Debug("watch/watching", "watch", watch, "watching", watching)
-
-	if prev != nil {
-
-		prevProperties := DefaultProperties
-		err = prev.Properties.Decode(&prevProperties)
-		if err != nil {
-			return
-		}
-
-		deleted := map[string]*internal.InstanceAccess{}
-
-		// For each in the previous spec that's not in the new spec, we need to start up the observation
-		// so that we can detect whether there are real instances that needs to be terminated to match
-		// the deletion in the new spec.
-		for name, access := range prevProperties.Resources {
-
-			if _, has := properties.Resources[name]; !has {
-
-				// this is no longer in the newer version of the spec, so it's a deletion.
-				// we need to have this still.
-
-				if err := c.configureAccessor(*prev, name, access); err != nil {
-					return err
-				}
-
-				deleted[name] = access
-				log.Debug("Initialize DELETED accessor", "name", name, "spec", spec, "access", access, "V", debugV2)
-			}
-		}
-
-		c.deleted = deleted
-	}
-
-	// build the fsm model
-	var model *Model
-	model, err = BuildModel(properties)
-	if err != nil {
-		return
-	}
-
-	c.model = model
-	c.properties = &properties
-	c.watch = watch
-	c.watching = watching
+	key = *k
 	return
 }
 
@@ -558,11 +608,11 @@ func processWatches(properties resource.Properties) (watch *Watch, watching map[
 	watch = &Watch{}
 	watching = map[string]Watchers{}
 
-	for key, access := range properties.Resources {
+	for key, access := range properties {
 		watchers := Watchers{}
 
 		// get a list of dependencies from the Spec properties
-		for _, path := range depends(access.Spec.Properties) {
+		for _, path := range types.ParseDepends(access.Spec.Properties) {
 
 			key, err := keyFromPath(path)
 			if err != nil {
@@ -592,7 +642,7 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 		return spec, err
 	}
 
-	properties = dependV(properties,
+	properties = types.EvalDepends(properties,
 		func(p types.Path) (interface{}, error) {
 			v := types.Get(p, c.resources)
 			return v, nil
@@ -603,20 +653,20 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 		return spec, err
 	}
 
-	if depends := depends(any); len(depends) > 0 {
+	if depends := types.ParseDepends(any); len(depends) > 0 {
 		return spec, fmt.Errorf("missing data %v", any.String())
 	}
 
 	processed.Properties = any
 
 	processed.Tags = map[string]string{
-		ResourceNameLabel:       resourceName,
-		ResourceCollectionLabel: c.Collection.Spec.Metadata.Name,
+		internal.InstanceLabel:   resourceName,
+		internal.CollectionLabel: c.Collection.Spec.Metadata.Name,
 	}
 	types.NewLink().WriteMap(processed.Tags)
 
 	// Additional labels in the InstanceAccess spec
-	access := c.properties.Resources[resourceName]
+	access := c.accessors[resourceName]
 	if access != nil {
 		for k, v := range access.Labels {
 			processed.Tags[k] = v
@@ -624,92 +674,4 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 	}
 
 	return processed, nil
-}
-
-const (
-	// ResourceNameLabel is the label name used for labeling the resource with the name in the collection
-	ResourceNameLabel = "infrakit_resource_name"
-	// ResourceCollectionLabel is the the label used to label the name of the collection
-	ResourceCollectionLabel = "infrakit_resource_collection"
-)
-
-func dependV(v interface{}, fetcher func(types.Path) (interface{}, error)) interface{} {
-	switch v := v.(type) {
-	case map[string]interface{}:
-		for k, vv := range v {
-			v[k] = dependV(vv, fetcher)
-		}
-	case []interface{}:
-		for i, vv := range v {
-			v[i] = dependV(vv, fetcher)
-		}
-	case string:
-		if p, ok := parseDepends(v); ok {
-			// found a depend, now get the real value and swap
-			newV, err := fetcher(p)
-			if err != nil {
-				return err.Error()
-			}
-			if newV != nil {
-				return newV
-			}
-		}
-	default:
-	}
-	return v
-}
-
-func keyFromPath(path types.Path) (key string, err error) {
-	k := path.Clean().Index(0)
-	if k == nil {
-		err = fmt.Errorf("no key %v", path)
-		return
-	}
-	key = *k
-	return
-}
-
-// depends parses the blob and returns a list of paths. The path's first component is the
-// name of the resource. e.g. dep `net1/cidr`
-func depends(any *types.Any) []types.Path {
-	var v interface{}
-	err := any.Decode(&v)
-	if err != nil {
-		return nil
-	}
-	l := parse(v, []types.Path{})
-	types.SortPaths(l)
-	return l
-}
-
-// Special format of a string value to denote a dependency on another resource's (within the same collection)
-// property field.  Eg. "@depends('net1/cidr')@"
-var dependsRegex = regexp.MustCompile("\\@depend\\('(([[:alnum:]]|-|_|\\.|/|\\[|\\])+)'\\)\\@")
-
-func parse(v interface{}, found []types.Path) (out []types.Path) {
-	switch v := v.(type) {
-	case map[string]interface{}:
-		for _, vv := range v {
-			out = append(out, parse(vv, nil)...)
-		}
-	case []interface{}:
-		for _, vv := range v {
-			out = append(out, parse(vv, nil)...)
-		}
-	case string:
-		if p, ok := parseDepends(v); ok {
-			out = append(out, p)
-		}
-	default:
-	}
-	out = append(found, out...)
-	return
-}
-
-func parseDepends(text string) (types.Path, bool) {
-	matches := dependsRegex.FindStringSubmatch(text)
-	if len(matches) > 1 {
-		return types.PathFromString(matches[1]), true
-	}
-	return types.Path{}, false
 }

@@ -1,21 +1,12 @@
 package resource
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
 	resource "github.com/docker/infrakit/pkg/controller/resource/types"
 	"github.com/docker/infrakit/pkg/fsm"
-	"github.com/docker/infrakit/pkg/types"
 )
-
-var defaultModelProperties = resource.ModelProperties{
-	TickUnit:            types.FromDuration(1 * time.Second),
-	WaitBeforeProvision: fsm.Tick(60),
-	WaitBeforeDestroy:   fsm.Tick(60),
-	ChannelBufferSize:   10,
-}
 
 // Model encapsulates the workflow / state machines for provisioning resources
 type Model struct {
@@ -97,10 +88,14 @@ func (m *Model) Stop() {
 	if m.set != nil {
 		m.set.Stop()
 		m.clock.Stop()
-	}
 
-	close(m.instanceDestroyChan)
-	close(m.instanceProvisionChan)
+		close(m.instanceDestroyChan)
+		close(m.instanceProvisionChan)
+		close(m.instancePendingChan)
+		close(m.instanceReadyChan)
+		close(m.cleanupChan)
+		m.set = nil
+	}
 }
 
 const (
@@ -127,25 +122,21 @@ const (
 )
 
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
-func BuildModel(properties resource.Properties) (*Model, error) {
+func BuildModel(properties resource.Properties, options resource.Options) (*Model, error) {
 
-	if properties.WaitBeforeProvision == 0 {
-		return nil, fmt.Errorf("invalid WaitBeforeProvision tickSize")
-	}
-
-	log.Info("Build model", "properties", properties)
+	log.Info("Build model", "properties", properties, "options", options)
 	model := &Model{
 		Properties:            properties,
-		instanceDestroyChan:   make(chan fsm.FSM, properties.ChannelBufferSize),
-		instanceProvisionChan: make(chan fsm.FSM, properties.ChannelBufferSize),
-		instancePendingChan:   make(chan fsm.FSM, properties.ChannelBufferSize),
-		instanceReadyChan:     make(chan fsm.FSM, properties.ChannelBufferSize),
-		cleanupChan:           make(chan fsm.FSM, properties.ChannelBufferSize),
+		instanceDestroyChan:   make(chan fsm.FSM, options.ChannelBufferSize),
+		instanceProvisionChan: make(chan fsm.FSM, options.ChannelBufferSize),
+		instancePendingChan:   make(chan fsm.FSM, options.ChannelBufferSize),
+		instanceReadyChan:     make(chan fsm.FSM, options.ChannelBufferSize),
+		cleanupChan:           make(chan fsm.FSM, options.ChannelBufferSize),
 		tickSize:              1 * time.Second,
 	}
 
 	// find the max observation interval and set the model tick to be that
-	for _, accessor := range properties.Resources {
+	for _, accessor := range properties {
 		if model.tickSize < accessor.ObserveInterval.Duration() {
 			model.tickSize = accessor.ObserveInterval.Duration()
 		}
@@ -158,7 +149,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 	spec, err := fsm.Define(
 		fsm.State{
 			Index: requested,
-			TTL:   fsm.Expiry{properties.WaitBeforeProvision, provision},
+			TTL:   fsm.Expiry{options.WaitBeforeProvision, provision},
 			Transitions: map[fsm.Signal]fsm.Index{
 				resourceFound: ready,
 				resourceLost:  provisioning,
@@ -220,7 +211,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		},
 		fsm.State{
 			Index: unmatched,
-			TTL:   fsm.Expiry{properties.WaitBeforeDestroy, terminate},
+			TTL:   fsm.Expiry{options.WaitBeforeDestroy, terminate},
 			Transitions: map[fsm.Signal]fsm.Index{
 				terminate: terminating,
 			},
@@ -239,7 +230,7 @@ func BuildModel(properties resource.Properties) (*Model, error) {
 		},
 		fsm.State{
 			Index: terminated,
-			TTL:   fsm.Expiry{properties.WaitBeforeDestroy, cleanup},
+			TTL:   fsm.Expiry{options.WaitBeforeDestroy, cleanup},
 			Transitions: map[fsm.Signal]fsm.Index{
 				cleanup: terminated, // TODO - this is really unnecessary
 			},

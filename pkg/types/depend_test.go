@@ -10,6 +10,177 @@ import (
 	. "github.com/docker/infrakit/pkg/testing"
 )
 
+func TestParseDepends(t *testing.T) {
+	require.False(t, DependRegex.MatchString("gopher"))
+	require.False(t, DependRegex.MatchString("@depend()"))
+	require.True(t, DependRegex.MatchString("@depend('./bca/xyz/foo')@"))
+	require.True(t, DependRegex.MatchString("@depend('bca/xyz/foo')@"))
+	require.True(t, DependRegex.MatchString("@depend('bca/xyz/foo/field2')@"))
+	require.True(t, DependRegex.MatchString("@depend('bca/xyz/foo/[2]')@"))
+
+	{
+		_, match := Depend("foo").Parse()
+		require.False(t, match)
+	}
+	{
+		_, match := Depend("foo/bar/baz").Parse()
+		require.False(t, match)
+	}
+	{
+		p, match := Depend("@depend('foo/bar/baz')@").Parse()
+		require.True(t, match)
+		require.Equal(t, `foo/bar/baz`, p.String())
+	}
+
+	{
+		var v interface{}
+		require.NoError(t, Decode([]byte(`
+field1: bar
+field2: 2
+field3: "@depend('net1/foo/bar')@"
+`), &v))
+		require.Equal(t, []Path{PathFromString(`net1/foo/bar`)}, parse(v, []Path{}))
+		require.Equal(t, []Path{PathFromString(`net1/foo/bar`)}, ParseDepends(AnyValueMust(v)))
+	}
+	{
+		var v interface{}
+		require.NoError(t, Decode([]byte(`
+field1: bar
+field2: 2
+`), &v))
+		require.Equal(t, []Path{}, parse(v, []Path{}))
+		require.Equal(t, []Path{}, ParseDepends(AnyValueMust(v)))
+	}
+	{
+		var v interface{}
+		require.NoError(t, Decode([]byte(`
+field1: bar
+field2: 2
+field3: "@depend('net1')@"
+field4:
+  object_field1 : test
+  object_field2 : "@depend('net1/foo/bar/2')@"
+field5: "@depend('net1/foo/bar/3')@"
+`), &v))
+		require.Equal(t, PathsFromStrings(
+			`net1`,
+			`net1/foo/bar/2`,
+			`net1/foo/bar/3`,
+		), Paths(ParseDepends(AnyValueMust(v))))
+	}
+	{
+		var v interface{}
+		require.NoError(t, Decode([]byte(`
+field1: bar
+field2: 2
+field3: "@depend('net1/foo/bar/1')@"
+field4:
+  object_field1 : test
+  object_field2 : "@depend('net1/foo/bar/2')@"
+  object_field3 :
+    - element1: "@depend('net1/foo/bar/3/1')@"
+    - element2: "@depend('net1/foo/bar/3/2')@"
+    - element3: "@depend('net1/foo/bar/3/3')@"
+    - element4: "@depend('net1/foo/bar/3/4')@"
+field5: "@depend('net1/foo/bar/4')@"
+`), &v))
+
+		list1 := PathsFromStrings(
+			`net1/foo/bar/1`,
+			`net1/foo/bar/2`,
+			`net1/foo/bar/3/1`,
+			`net1/foo/bar/3/2`,
+			`net1/foo/bar/3/3`,
+			`net1/foo/bar/3/4`,
+			`net1/foo/bar/4`,
+		)
+		list2 := Paths(parse(v, nil))
+		list1.Sort()
+		list2.Sort()
+		require.Equal(t, list1, list2)
+	}
+
+}
+
+func TestEvalDepends(t *testing.T) {
+	{
+		var v interface{}
+		require.NoError(t, Decode([]byte(`
+field1: bar
+field2: 2
+field3: "@depend('net1/foo/bar/1')@"
+field4:
+  object_field1 : test
+  object_field2 : "@depend('net1/foo/bar/2')@"
+  object_field3 :
+    - element1: "@depend('net1/foo/bar/3/1')@"
+    - element2: "@depend('net1/foo/bar/3/2')@"
+    - element3: "@depend('net1/foo/bar/3/3')@"
+    - element4: "@depend('net1/foo/bar/3/4')@"
+field5: "@depend('net1/foo/bar/4')@"
+`), &v))
+
+		store := map[string]interface{}{
+			`net1/foo/bar/1`:   true,
+			`net1/foo/bar/2`:   2,
+			`net1/foo/bar/3/1`: "3-1",
+			`net1/foo/bar/3/2`: int64(32),
+			`net1/foo/bar/3/3`: "3-3",
+			`net1/foo/bar/3/4`: []string{"3", "4"},
+			`net1/foo/bar/4`:   map[string]string{"foo": "bar"},
+		}
+
+		fetch := func(p Path) (interface{}, error) {
+			return store[p.String()], nil
+		}
+
+		// add value
+
+		vv := EvalDepends(v, fetch)
+		require.Equal(t, store[`net1/foo/bar/1`], Get(PathFromString(`field3`), vv))
+		require.Equal(t, store[`net1/foo/bar/2`], Get(PathFromString(`field4/object_field2`), vv))
+		require.Equal(t, store[`net1/foo/bar/3/1`], Get(PathFromString(`field4/object_field3/[0]/element1`), vv))
+		require.Equal(t, store[`net1/foo/bar/3/2`], Get(PathFromString(`field4/object_field3/[1]/element2`), vv))
+		require.Equal(t, store[`net1/foo/bar/3/3`], Get(PathFromString(`field4/object_field3/[2]/element3`), vv))
+		require.Equal(t, store[`net1/foo/bar/3/4`], Get(PathFromString(`field4/object_field3/[3]/element4`), vv))
+		require.Equal(t, store[`net1/foo/bar/4`], Get(PathFromString(`field5`), vv))
+
+	}
+	{
+		var v interface{}
+		require.NoError(t, Decode([]byte(`
+field1: bar
+field2: 2
+field3: "@depend('net1/foo/bar/1')@"
+field4:
+  object_field1 : test
+  object_field2 : "@depend('net1/foo/bar/2')@"
+  object_field3 :
+    - element1: "@depend('net1/foo/bar/3/1')@"
+    - element2: "@depend('net1/foo/bar/3/2')@"
+    - element3: "@depend('net1/foo/bar/3/3')@"
+    - element4: "@depend('net1/foo/bar/3/4')@"
+field5: "@depend('net1/foo/bar/4')@"
+`), &v))
+
+		store := map[string]interface{}{
+			`net1/foo/bar/1`:   true,
+			`net1/foo/bar/2`:   2,
+			`net1/foo/bar/3/3`: "3-3",
+			`net1/foo/bar/3/4`: []string{"3", "4"},
+		}
+
+		fetch := func(p Path) (interface{}, error) {
+			return store[p.String()], nil
+		}
+
+		vv := EvalDepends(v, fetch)
+		any := AnyValueMust(vv)
+		depends := ParseDepends(any)
+		require.Equal(t, 3, len(depends))
+	}
+}
+
 func TestFindSpecs0(t *testing.T) {
 
 	spec := `
