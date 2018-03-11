@@ -124,10 +124,6 @@ const (
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
 func BuildModel(properties resource.Properties, options resource.Options) (*Model, error) {
 
-	if options.WaitBeforeProvision == 0 {
-		panic("bad")
-	}
-
 	log.Info("Build model", "properties", properties, "options", options)
 	model := &Model{
 		Properties:            properties,
