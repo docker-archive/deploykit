@@ -22,7 +22,7 @@ properties:
       az: az1
       type: network
     Properties:
-      wait: "@depend('az1-net1/ID')@"
+      wait: {{ depend `az1-net1/ID` }}
       cidr: 10.20.200.0/24
       gateway: 10.20.0.1
   az2-net1:
@@ -31,7 +31,7 @@ properties:
       az: az2
       type: network
     Properties:
-      wait: "@depend('az1-net1/ID')@"
+      wait: {{ depend `az1-net1/ID` }}
       cidr: 192.178.100.0/24
       gateway: 192.178.0.1
   az2-net2:
@@ -40,7 +40,7 @@ properties:
       az: az2
       type: network
     Properties:
-      wait: "@depend('az1-net1/ID')@"
+      wait: {{ depend `az1-net1/ID` }}
       cidr: 192.178.200.0/24
       gateway: 192.178.0.1
   az1-disk1:
@@ -49,8 +49,8 @@ properties:
       az: az1
       type: storage
     Properties:
-      net: "@depend('az1-net1/ID')@"
-      gw: "@depend('az1-net1/Properties/gateway')@"
+      net: {{ depend `az1-net1/ID` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
       fs: ext4
       size: 1TB
   az1-disk2:
@@ -59,8 +59,8 @@ properties:
       az: az1
       type: storage
     Properties:
-      net: "@depend('az1-net2/ID')@"
-      gw: "@depend('az1-net2/Properties/gateway')@"
+      net: {{ depend `az1-net2/ID` }}
+      gw: {{ depend `az1-net2/Properties/gateway` }}
       fs: ext4
       size: 1TB
   az2-disk1:
@@ -69,8 +69,8 @@ properties:
       az: az2
       type: storage
     Properties:
-      net: "@depend('az2-net1/ID')@"
-      gw: "@depend('az2-net1/Properties/gateway')@"
+      net: {{ depend `az2-net1/ID` }}
+      gw: {{ depend `az2-net1/Properties/gateway` }}
       fs: ext4
       size: 1TB
   az2-disk1:
@@ -79,7 +79,7 @@ properties:
       az: az2
       type: storage
     Properties:
-      net: "@depend('az2-net2/ID')@"
-      gw: "@depend('az2-net2/Properties/gateway')@"
+      net: {{ depend `az2-net2/ID` }}
+      gw: {{ depend `az2-net2/Properties/gateway` }}
       fs: ext4
       size: 1TB
