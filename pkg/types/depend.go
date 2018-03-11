@@ -2,10 +2,94 @@ package types
 
 import (
 	"encoding/json"
+	"fmt"
 	"reflect"
+	"regexp"
 
 	"github.com/twmb/algoimpl/go/graph"
 )
+
+// DependRegex is the regex for the special format of a string value to denote a dependency
+// on another resource's property field.  Eg. "@depends('net1/cidr')@"
+var DependRegex = regexp.MustCompile("\\@depend\\('(([[:alnum:]]|-|_|\\.|/|\\[|\\])+)'\\)\\@")
+
+// Depend is a specification of a dependency
+type Depend string
+
+// NewDepend returns a Depend
+func NewDepend(p string) (Depend, error) {
+	return Depend(fmt.Sprintf("\"@depend('%s')@\"", p)), nil
+}
+
+// Parse parses the expression into a path.  If it's not a valid expression, false is returned.
+func (d Depend) Parse() (Path, bool) {
+	matches := DependRegex.FindStringSubmatch(string(d))
+	if len(matches) > 1 {
+		return PathFromString(matches[1]), true
+	}
+	return Path{}, false
+}
+
+// EvalDepends takes a value that possibly have a number of depend expressions and evaluate
+// all expression within and substitute values from the fetcher.
+func EvalDepends(v interface{}, fetcher func(Path) (interface{}, error)) interface{} {
+	switch v := v.(type) {
+	case map[string]interface{}:
+		for k, vv := range v {
+			v[k] = EvalDepends(vv, fetcher)
+		}
+	case []interface{}:
+		for i, vv := range v {
+			v[i] = EvalDepends(vv, fetcher)
+		}
+	case string:
+		if p, ok := Depend(v).Parse(); ok {
+			// found a depend, now get the real value and swap
+			newV, err := fetcher(p)
+			if err != nil {
+				return err.Error()
+			}
+			if newV != nil {
+				return newV
+			}
+		}
+	default:
+	}
+	return v
+}
+
+// ParseDepends parses the blob and returns a list of paths. The path's first component is the
+// name of the resource. e.g. dep `net1/cidr`
+func ParseDepends(any *Any) []Path {
+	var v interface{}
+	err := any.Decode(&v)
+	if err != nil {
+		return nil
+	}
+	l := parse(v, []Path{})
+	SortPaths(l)
+	return l
+}
+
+func parse(v interface{}, found []Path) (out []Path) {
+	switch v := v.(type) {
+	case map[string]interface{}:
+		for _, vv := range v {
+			out = append(out, parse(vv, nil)...)
+		}
+	case []interface{}:
+		for _, vv := range v {
+			out = append(out, parse(vv, nil)...)
+		}
+	case string:
+		if p, ok := Depend(v).Parse(); ok {
+			out = append(out, p)
+		}
+	default:
+	}
+	out = append(found, out...)
+	return
+}
 
 // converts a map to a Spec, nil if it cannot be done
 func mapToSpec(m map[string]interface{}) *Spec {

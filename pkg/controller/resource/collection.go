@@ -3,7 +3,6 @@ package resource
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
@@ -594,6 +593,17 @@ func (c *collection) configureAccessor(spec types.Spec, name string, access *int
 
 	return access.Init(c.Scope(), c.options.PluginRetryInterval.AtLeast(1*time.Second))
 }
+
+func keyFromPath(path types.Path) (key string, err error) {
+	k := path.Clean().Index(0)
+	if k == nil {
+		err = fmt.Errorf("no key %v", path)
+		return
+	}
+	key = *k
+	return
+}
+
 func processWatches(properties resource.Properties) (watch *Watch, watching map[string]Watchers) {
 	watch = &Watch{}
 	watching = map[string]Watchers{}
@@ -602,7 +612,7 @@ func processWatches(properties resource.Properties) (watch *Watch, watching map[
 		watchers := Watchers{}
 
 		// get a list of dependencies from the Spec properties
-		for _, path := range depends(access.Spec.Properties) {
+		for _, path := range types.ParseDepends(access.Spec.Properties) {
 
 			key, err := keyFromPath(path)
 			if err != nil {
@@ -632,7 +642,7 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 		return spec, err
 	}
 
-	properties = dependV(properties,
+	properties = types.EvalDepends(properties,
 		func(p types.Path) (interface{}, error) {
 			v := types.Get(p, c.resources)
 			return v, nil
@@ -643,7 +653,7 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 		return spec, err
 	}
 
-	if depends := depends(any); len(depends) > 0 {
+	if depends := types.ParseDepends(any); len(depends) > 0 {
 		return spec, fmt.Errorf("missing data %v", any.String())
 	}
 
@@ -664,85 +674,4 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 	}
 
 	return processed, nil
-}
-
-func dependV(v interface{}, fetcher func(types.Path) (interface{}, error)) interface{} {
-	switch v := v.(type) {
-	case map[string]interface{}:
-		for k, vv := range v {
-			v[k] = dependV(vv, fetcher)
-		}
-	case []interface{}:
-		for i, vv := range v {
-			v[i] = dependV(vv, fetcher)
-		}
-	case string:
-		if p, ok := parseDepends(v); ok {
-			// found a depend, now get the real value and swap
-			newV, err := fetcher(p)
-			if err != nil {
-				return err.Error()
-			}
-			if newV != nil {
-				return newV
-			}
-		}
-	default:
-	}
-	return v
-}
-
-func keyFromPath(path types.Path) (key string, err error) {
-	k := path.Clean().Index(0)
-	if k == nil {
-		err = fmt.Errorf("no key %v", path)
-		return
-	}
-	key = *k
-	return
-}
-
-// depends parses the blob and returns a list of paths. The path's first component is the
-// name of the resource. e.g. dep `net1/cidr`
-func depends(any *types.Any) []types.Path {
-	var v interface{}
-	err := any.Decode(&v)
-	if err != nil {
-		return nil
-	}
-	l := parse(v, []types.Path{})
-	types.SortPaths(l)
-	return l
-}
-
-// Special format of a string value to denote a dependency on another resource's (within the same collection)
-// property field.  Eg. "@depends('net1/cidr')@"
-var dependsRegex = regexp.MustCompile("\\@depend\\('(([[:alnum:]]|-|_|\\.|/|\\[|\\])+)'\\)\\@")
-
-func parse(v interface{}, found []types.Path) (out []types.Path) {
-	switch v := v.(type) {
-	case map[string]interface{}:
-		for _, vv := range v {
-			out = append(out, parse(vv, nil)...)
-		}
-	case []interface{}:
-		for _, vv := range v {
-			out = append(out, parse(vv, nil)...)
-		}
-	case string:
-		if p, ok := parseDepends(v); ok {
-			out = append(out, p)
-		}
-	default:
-	}
-	out = append(found, out...)
-	return
-}
-
-func parseDepends(text string) (types.Path, bool) {
-	matches := dependsRegex.FindStringSubmatch(text)
-	if len(matches) > 1 {
-		return types.PathFromString(matches[1]), true
-	}
-	return types.Path{}, false
 }

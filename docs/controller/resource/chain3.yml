@@ -1,4 +1,4 @@
-{{/* =% doc %= */}}
+{{/* =% text %= */}}
 kind: resource
 metadata:
   name: chain
@@ -19,8 +19,8 @@ properties:
       az: az1
       type: storage
     Properties:
-      dep: "@depend('az1-net1/ID')@"
-      depname: "@depend('az1-net1/Tags/infrakit_instance')@"
-      gw: "@depend('az1-net1/Properties/gateway')@"
+      dep: {{ depend `az1-net1/ID` }}
+      depname: {{ depend `az1-net1/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
       fs: ext4
       size: 1TB

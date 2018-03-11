@@ -16,6 +16,7 @@ import (
 	"github.com/docker/infrakit/pkg/callable/backend"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
+	"github.com/docker/infrakit/pkg/types"
 )
 
 const (
@@ -373,16 +374,20 @@ func (c *Callable) defineOrGetParameterList(n, ftype, desc string, optional ...i
 func (c *Callable) Funcs() []template.Function {
 	return []template.Function{
 		{
+			Name: "depend",
+			Func: types.NewDepend,
+		},
+		{
 			Name: "flag",
+			Func: c.defineOrGetParameter,
+		},
+		{
+			Name: "param",
 			Func: c.defineOrGetParameter,
 		},
 		{
 			Name: "listflag",
 			Func: c.defineOrGetParameterList,
-		},
-		{
-			Name: "param",
-			Func: c.defineOrGetParameter,
 		},
 		{
 			Name: "listparam",
