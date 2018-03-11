@@ -11,6 +11,7 @@ import (
 
 func init() {
 	backend.Register("print", Print, nil)
+	backend.Register("doc", Print, nil)
 }
 
 // Print takes a list of optional parameters and returns an executable function that prints

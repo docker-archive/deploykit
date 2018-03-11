@@ -17,6 +17,13 @@ import (
 	"github.com/docker/infrakit/pkg/types"
 )
 
+const (
+	// InstanceLabel is the label name used for labeling the resource with the name in the collection
+	InstanceLabel = "infrakit_instance"
+	// CollectionLabel is the the label used to label the name of the collection
+	CollectionLabel = "infrakit_collection"
+)
+
 // stateMachine is a struct for a single state machine and its definition
 type stateMachine struct {
 	fsm.FSM
@@ -186,7 +193,9 @@ func (c *Collection) MetadataGone(key func(instance.Description) (string, error)
 				continue
 			}
 
-			delete(view, k)
+			types.Put(types.PathFromString(k), map[string]interface{}{
+				"gone": time.Now(),
+			}, view)
 		}
 	}
 
@@ -241,13 +250,13 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 				log.Error("cannot decode properties", "instance", d.ID, "err", err)
 			}
 
-			view[k] = entry{
+			types.Put(types.PathFromString(k), entry{
 				ID:          d.ID,
 				LogicalID:   d.LogicalID,
 				Tags:        d.Tags,
 				Properties:  p,
 				description: d,
-			}
+			}, view)
 
 			c.events <- event.Event{
 				Topic:   c.Topic(TopicMetadataUpdate),

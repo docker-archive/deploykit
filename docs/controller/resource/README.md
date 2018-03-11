@@ -17,7 +17,7 @@ There are examples in this directory.  The yml `chain.yml` demonstrates the use 
 of the instance plugin responsible for provisioning the resource.  For example
 
 ```
-  resources:
+  properties:
     az1-net1:
       plugin: az1/net
       labels:
@@ -93,9 +93,14 @@ This will subscribe to all events from the top `/`.
 Now commit the configuration for resources:
 
 ```
-infrakit local mystack/resource commit -y ./chain.yml
+infrakit local mystack/resource commit -y <(infrakit use res chain.yml)
 ```
 
+or via unix pipe:
+
+```
+infrakit use res chain.yml | infrakit local mystack/resource commit -y -
+```
 This will create a `chain` collection in the resource controller.  As the controller tries to reconcile the
 discovered state with the specification, you will see event messages that correspond to the state transition
 of each represented resources (e.g. `chain/az1-disk0`).  The `chain.yml` file is essentially a linked list
