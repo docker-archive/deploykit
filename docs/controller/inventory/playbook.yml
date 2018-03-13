@@ -1,0 +1,8 @@
+
+# Start infrakit
+start : start.sh
+
+az1.yml : az1.yml
+az2.yml : az2.yml
+
+inventory.yml : inventory.yml

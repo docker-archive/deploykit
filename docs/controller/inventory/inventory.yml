@@ -1,0 +1,24 @@
+{{/* =% text %= */}}
+kind: inventory
+metadata:
+  name: mystack-inventory
+options:
+  WaitBeforeRetryTerminate: 1
+properties:
+  network:
+    - plugin: az1/net
+      labels:
+        az: az1
+        type: network
+        infrakit_collection_name: az1-resources
+    - plugin: az2/net
+      labels:
+        az: az2
+        type: network
+        infrakit_collection_name: az2-resources
+  disks:
+    - plugin: az1/disk
+      labels:
+        az: az1
+        type: storage
+        infrakit_collection_name: az1-resources

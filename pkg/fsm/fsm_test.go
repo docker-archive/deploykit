@@ -26,7 +26,7 @@ func TestDefinition(t *testing.T) {
 		},
 	}
 
-	_, err := compile(m)
+	_, err := newSpec().compile(m)
 	require.Error(t, err)
 
 	// add missing
@@ -38,7 +38,7 @@ func TestDefinition(t *testing.T) {
 		Visit: Limit{5, turnOn},
 	}
 
-	_, err = compile(m)
+	_, err = newSpec().compile(m)
 	require.NoError(t, err)
 
 	states := []State{}
