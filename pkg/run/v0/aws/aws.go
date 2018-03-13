@@ -2,15 +2,10 @@ package aws
 
 import (
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go/service/autoscaling"
-	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
-	"github.com/aws/aws-sdk-go/service/dynamodb"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/sqs"
 	"github.com/docker/infrakit/pkg/launch/inproc"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
@@ -20,7 +15,6 @@ import (
 	"github.com/docker/infrakit/pkg/run"
 	"github.com/docker/infrakit/pkg/run/local"
 	"github.com/docker/infrakit/pkg/run/scope"
-	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/loadbalancer"
 	"github.com/docker/infrakit/pkg/spi/metadata"
@@ -42,9 +36,6 @@ const (
 
 	// EnvMetadataPollInterval is the env to set fo polling for metadata updates
 	EnvMetadataPollInterval = "INFRAKIT_AWS_METADATA_POLL_INTERVAL"
-
-	// EnvMonitorPollInterval is the env to set fo polling for instance changes
-	EnvMonitorPollInterval = "INFRAKIT_AWS_MONITOR_POLL_INTERVAL"
 
 	// EnvNamespaceTags is the env to set for namespace tags. It's k=v,...
 	EnvNamespaceTags = "INFRAKIT_AWS_NAMESPACE_TAGS"
@@ -70,9 +61,6 @@ type Options struct {
 	// ELBNames is a list of names for ELB instances to start the L4 plugins
 	ELBNames []string
 
-	// MonitorPollInterval is the interval for the polling to observe instance new/delete events
-	MonitorPollInterval time.Duration
-
 	aws_metadata.Options `json:",inline" yaml:",inline"`
 }
 
@@ -90,9 +78,8 @@ func defaultNamespace() map[string]string {
 
 // DefaultOptions return an Options with default values filled in.
 var DefaultOptions = Options{
-	Namespace:           defaultNamespace(),
-	ELBNames:            strings.Split(local.Getenv(EnvELBNames, ""), ","),
-	MonitorPollInterval: types.MustParseDuration(local.Getenv(EnvMonitorPollInterval, "0s")).Duration(),
+	Namespace: defaultNamespace(),
+	ELBNames:  strings.Split(local.Getenv(EnvELBNames, ""), ","),
 	Options: aws_metadata.Options{
 		Template:  local.Getenv(EnvMetadataTemplateURL, ""),
 		StackName: local.Getenv(EnvStackName, ""),
@@ -123,33 +110,24 @@ func Run(scope scope.Scope, name plugin.Name,
 		return
 	}
 
-	autoscalingClient := autoscaling.New(builder.Config)
-	cloudWatchLogsClient := cloudwatchlogs.New(builder.Config)
-	dynamodbClient := dynamodb.New(builder.Config)
 	ec2Client := ec2.New(builder.Config)
 	iamClient := iam.New(builder.Config)
-	sqsClient := sqs.New(builder.Config)
 	elbClient := elb.New(builder.Config)
 
 	transport.Name = name
 	impls = map[run.PluginCode]interface{}{
 		run.Instance: map[string]instance.Plugin{
-			"autoscaling-autoscalinggroup":    aws_instance.NewAutoScalingGroupPlugin(autoscalingClient, options.Namespace),
-			"autoscaling-launchconfiguration": aws_instance.NewLaunchConfigurationPlugin(autoscalingClient, options.Namespace),
-			"cloudwatchlogs-loggroup":         aws_instance.NewLogGroupPlugin(cloudWatchLogsClient, options.Namespace),
-			"dynamodb-table":                  aws_instance.NewTablePlugin(dynamodbClient, options.Namespace),
-			"ec2-instance":                    instancePlugin,
-			"ec2-spot-instance":               aws_instance.NewSpotInstancePlugin(ec2Client, options.Namespace),
-			"ec2-internetgateway":             aws_instance.NewInternetGatewayPlugin(ec2Client, options.Namespace),
-			"ec2-routetable":                  aws_instance.NewRouteTablePlugin(ec2Client, options.Namespace),
-			"ec2-securitygroup":               aws_instance.NewSecurityGroupPlugin(ec2Client, options.Namespace),
-			"ec2-subnet":                      aws_instance.NewSubnetPlugin(ec2Client, options.Namespace),
-			"ec2-volume":                      aws_instance.NewVolumePlugin(ec2Client, options.Namespace),
-			"ec2-vpc":                         aws_instance.NewVpcPlugin(ec2Client, options.Namespace),
-			"elb-loadbalancer":                aws_instance.NewLoadBalancerPlugin(elbClient, options.Namespace),
-			"iam-instanceprofile":             aws_instance.NewInstanceProfilePlugin(iamClient, options.Namespace),
-			"iam-role":                        aws_instance.NewRolePlugin(iamClient, options.Namespace),
-			"sqs-queue":                       aws_instance.NewQueuePlugin(sqsClient, options.Namespace),
+			"ec2-instance":        instancePlugin,
+			"ec2-spot-instance":   aws_instance.NewSpotInstancePlugin(ec2Client, options.Namespace),
+			"ec2-internetgateway": aws_instance.NewInternetGatewayPlugin(ec2Client, options.Namespace),
+			"ec2-routetable":      aws_instance.NewRouteTablePlugin(ec2Client, options.Namespace),
+			"ec2-securitygroup":   aws_instance.NewSecurityGroupPlugin(ec2Client, options.Namespace),
+			"ec2-subnet":          aws_instance.NewSubnetPlugin(ec2Client, options.Namespace),
+			"ec2-volume":          aws_instance.NewVolumePlugin(ec2Client, options.Namespace),
+			"ec2-vpc":             aws_instance.NewVpcPlugin(ec2Client, options.Namespace),
+			"elb-loadbalancer":    aws_instance.NewLoadBalancerPlugin(elbClient, options.Namespace),
+			"iam-instanceprofile": aws_instance.NewInstanceProfilePlugin(iamClient, options.Namespace),
+			"iam-role":            aws_instance.NewRolePlugin(iamClient, options.Namespace),
 		},
 	}
 
@@ -166,19 +144,6 @@ func Run(scope scope.Scope, name plugin.Name,
 
 	if len(l4Map) > 0 {
 		impls[run.L4] = func() (map[string]loadbalancer.L4, error) { return l4Map, nil }
-	}
-
-	if options.MonitorPollInterval > 0 {
-		log.Info("run the event source for watching instance add/removes", "poll", options.MonitorPollInterval)
-		monitor := &aws_instance.Monitor{Plugin: instancePlugin}
-		impls[run.Event] = func() (map[string]event.Plugin, error) {
-			return map[string]event.Plugin{
-				"ec2-instance": monitor.Init(),
-			}, nil
-		}
-		onStop = func() {
-			monitor.Stop()
-		}
 	}
 
 	if u := local.Getenv(EnvMetadataTemplateURL, ""); u != "" {

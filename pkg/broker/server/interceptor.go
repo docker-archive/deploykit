@@ -5,7 +5,13 @@ import (
 	"net/http"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
+)
+
+var (
+	log     = logutil.New("module", "event/broker/server")
+	debugV  = logutil.V(500)
+	debugV2 = logutil.V(1000)
 )
 
 // Interceptor implements http Handler and is used to intercept incoming requests to subscribe
@@ -36,7 +42,7 @@ func (i *Interceptor) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 
 	err := i.Pre(topic, req.Header)
 	if err != nil {
-		log.Warningln("Error:", err)
+		log.Warn("error", "err", err)
 		http.Error(rw, err.Error(), getStatusCode(err))
 		return
 	}

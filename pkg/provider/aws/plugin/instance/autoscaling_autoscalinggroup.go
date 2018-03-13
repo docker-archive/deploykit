@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/autoscaling"
 	"github.com/aws/aws-sdk-go/service/autoscaling/autoscalingiface"
@@ -131,7 +130,7 @@ func (p awsAutoScalingGroupPlugin) DescribeInstances(labels map[string]string, p
 					if v, err := types.AnyValue(group); err == nil {
 						status = v
 					} else {
-						log.Warningln("cannot encode AutoScalingGroup:", err)
+						log.Warn("cannot encode AutoScalingGroup", "err", err)
 					}
 				}
 				descriptions = append(

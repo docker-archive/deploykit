@@ -2,6 +2,8 @@ package instance
 
 import (
 	"errors"
+	"fmt"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/client"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -11,8 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/spf13/pflag"
-	"log"
-	"os"
 )
 
 // Options contain the options for aws plugin
@@ -62,13 +62,13 @@ func (b *Builder) BuildInstancePlugin(namespaceTags map[string]string) (instance
 		}
 
 		if b.Options.Region == "" || b.Options.Region == "auto" {
-			log.Println("region not specified, attempting to discover from EC2 instance metadata")
+			log.Warn("region not specified, attempting to discover from EC2 instance metadata")
 			region, err := GetRegion()
 			if err != nil {
 				return nil, errors.New("Unable to determine region")
 			}
 
-			log.Printf("Defaulting to local region %s\n", region)
+			log.Warn("Defaulting to local region", "region", region)
 			b.Options.Region = region
 		}
 
@@ -84,16 +84,13 @@ func (b *Builder) BuildInstancePlugin(namespaceTags map[string]string) (instance
 }
 
 type logger struct {
-	logger *log.Logger
 }
 
 func (l logger) Log(args ...interface{}) {
-	l.logger.Println(args...)
+	log.Info("AWS SDK", "message", fmt.Sprint(args...))
 }
 
 // GetLogger gets a logger that can be used with the AWS SDK.
 func GetLogger() aws.Logger {
-	return &logger{
-		logger: log.New(os.Stderr, "", log.LstdFlags),
-	}
+	return &logger{}
 }

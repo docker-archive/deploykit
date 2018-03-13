@@ -2,6 +2,18 @@
 # Start infrakit
 start : start.sh
 
+# Creates a vpc
+vpc : provision-vpc.yml
+
+# Creates a subnet
+subnet : provision-subnet.yml
+
+# Creates and attaches an internet gateway to VPC
+gateway : provision-gateway.yml
+
+# Creates a routetable and associate to VPC and subnet
+route : provision-routetable.yml
+
 # Create a single instance
 ondemand : provision-instance.yml
 

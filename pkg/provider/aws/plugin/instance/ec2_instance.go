@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -155,7 +154,7 @@ func mergeTags(tagMaps ...map[string]string) ([]string, map[string]string) {
 	for _, tagMap := range tagMaps {
 		for k, v := range tagMap {
 			if _, exists := tags[k]; exists {
-				log.Warnf("Ovewriting tag value for key %s", k)
+				log.Warn("Ovewriting tag value for key", "key", k)
 			} else {
 				keys = append(keys, k)
 			}
@@ -289,7 +288,7 @@ func (p awsInstancePlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 	}
 
 	if len(awsVolumeIDs) > 0 {
-		log.Infof("Waiting for instance %s to enter running state before attaching volume", *id)
+		log.Info("Waiting for instance to enter running state before attaching volume", "instance", *id)
 		for {
 			time.Sleep(10 * time.Second)
 
@@ -398,7 +397,7 @@ func (p awsInstancePlugin) describeInstances(tags map[string]string, properties 
 				if v, err := types.AnyValue(ec2Instance); err == nil {
 					status = v
 				} else {
-					log.Warningln("cannot encode ec2Instance:", err)
+					log.Warn("cannot encode ec2Instance:", "err", err)
 				}
 			}
 			descriptions = append(descriptions, instance.Description{

@@ -1,17 +1,17 @@
 {{/* Input to create instance using the AWS instance plugin */}}
 {{/* =% instanceProvision `aws/ec2-instance` %= */}}
 
-{{ $user := flag "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
-{{ $project := flag "project" "string" "project" | prompt "Project?" "string" "myproject" }}
-{{ $imageId := flag "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
-{{ $instanceType := flag "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
-{{ $privateIp := flag "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "172.31.20.100" }}
+{{ $user := param "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+{{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
+{{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
+{{ $privateIp := param "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "172.31.20.100" }}
 
 
-{{ $keyName := flag "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
-{{ $az := flag "az" "string" "availability zone" | prompt "Availability zone?" "string" "eu-central-1b"}}
-{{ $subnetId := flag "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" "subnet-11b8376a" }}
-{{ $securityGroupId := flag "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" "sg-975500fe" }}
+{{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
+{{ $az := param "az" "string" "availability zone" | prompt "Availability zone?" "string" "eu-central-1b"}}
+{{ $subnetId := param "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" "subnet-11b8376a" }}
+{{ $securityGroupId := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" "sg-975500fe" }}
 
 Tags:
   infrakit.scope: {{ $project }}

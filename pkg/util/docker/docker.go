@@ -8,16 +8,19 @@ import (
 	"os"
 	"runtime"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/sockets"
 	"github.com/docker/go-connections/tlsconfig"
+	logutil "github.com/docker/infrakit/pkg/log"
 )
 
 var (
 	// ClientVersion is the Docker client API version to use when connecting to Docker
 	// See Makefile targets that may set this at build time.
 	ClientVersion = "1.24"
+
+	log    = logutil.New("module", "util/docker")
+	debugV = logutil.V(500)
 )
 
 // ConnectInfo holds the connection parameters for connecting to a Docker engine to get join tokens, etc.
@@ -63,7 +66,7 @@ func newHTTPClient(host string, tlsOptions *tlsconfig.Options) (*http.Client, er
 		if err != nil {
 			return nil, err
 		}
-		log.Infoln("TLS config=", config)
+		log.Debug("TLS config", "config", config)
 	}
 	tr := &http.Transport{
 		TLSClientConfig: config,

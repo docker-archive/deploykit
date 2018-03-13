@@ -7,8 +7,12 @@ import (
 	"strings"
 	"syscall"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/launch"
+	logutil "github.com/docker/infrakit/pkg/log"
+)
+
+var (
+	log = logutil.New("module", "launch/os")
 )
 
 func start(executor launch.Exec, name, sh string, setPgID bool) <-chan error {
@@ -18,19 +22,19 @@ func start(executor launch.Exec, name, sh string, setPgID bool) <-chan error {
 
 		defer close(block)
 
-		log.Infoln("OS(", executor.Name(), ") launcher: Plugin", name, "setPgId=", setPgID, "starting", sh)
+		log.Info("OS executor", "name", executor.Name(), "Plugin", name, "setPgId=", setPgID, "starting", sh)
 		cmd := exec.Command("/bin/sh", "-c", sh)
 
-		log.Infoln("Running", cmd.Path, strings.Join(cmd.Args, " "))
+		log.Info("Running", "cmd", cmd.Path, "args", strings.Join(cmd.Args, " "))
 		// Set new pgid so the process doesn't exit when the starter exits.
 		cmd.SysProcAttr = &syscall.SysProcAttr{
 			Setpgid: setPgID,
 		}
 
 		err := cmd.Start()
-		log.Infoln("Starting with", err, "sh=", sh)
+		log.Info("Starting with", "sh", sh, "err", err)
 		if err != nil {
-			log.Warningln("OS launcher: Plugin", name, "failed to start:", err, "cmd=", sh)
+			log.Warn("Err from OS executor", "plugin", name, "err", err, "cmd", sh)
 			block <- err
 		}
 	}()

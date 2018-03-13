@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/armon/go-radix"
 	"github.com/docker/infrakit/pkg/types"
 )
@@ -113,7 +112,7 @@ func (b *Broker) Publish(topic string, data interface{}, optionalTimeout ...time
 func (b *Broker) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	defer func() {
 		if v := recover(); v != nil {
-			log.Warningln("broker.ServeHTTP recovered:", v)
+			log.Warn("broker.ServeHTTP recovered", "err", v)
 		}
 	}()
 
@@ -179,13 +178,13 @@ func (b *Broker) run() {
 						panic("assert-failed")
 					}
 					for ch := range chset {
-						log.Infoln("Closing client connection at", key, "ch=", ch)
+						log.Info("Closing client connection", "key", key, "ch", ch)
 						close(ch)
 					}
 					return false
 				})
 
-			log.Infoln("Broker finished")
+			log.Info("Broker finished")
 			return
 
 		case subscription := <-b.newClients:
@@ -205,7 +204,7 @@ func (b *Broker) run() {
 
 			b.clients.Insert(subscription.topic, subs)
 			b.count++
-			log.Infof("Connected: topic=%s => %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
+			log.Info("Connected", "topic", subscription.topic, "clients", b.count, "subCh", subscription.ch)
 
 		case subscription := <-b.closingClients:
 
@@ -225,14 +224,14 @@ func (b *Broker) run() {
 					}
 
 					b.count--
-					log.Infof("Disconnected: topic=%s => %d registered clients, ch=%v", subscription.topic, b.count, subscription.ch)
+					log.Info("Disconnected", "topic", subscription.topic, "clients", b.count, "subCh", subscription.ch)
 				}
 			}
 
 		case event, open := <-b.notifier:
 
 			if !open {
-				log.Infoln("Stopping broker")
+				log.Info("Stopping broker")
 				return
 			}
 
@@ -255,7 +254,7 @@ func (b *Broker) run() {
 						select {
 						case ch <- data:
 						case <-time.After(patience):
-							log.Print("Skipping client.")
+							log.Warn("Skipping client.")
 						}
 					}
 					return false

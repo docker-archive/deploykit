@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -283,7 +282,7 @@ func (p awsSpotInstancePlugin) Provision(spec instance.Spec) (*instance.ID, erro
 	}
 
 	if len(awsVolumeIDs) > 0 {
-		log.Infof("Waiting for request %s to enter fulfilled and instance to enter running state before attaching volume", *id)
+		log.Info("Waiting for instance to enter running state before attaching volume", "instance", *id)
 		err = p.client.WaitUntilSpotInstanceRequestFulfilled(&ec2.DescribeSpotInstanceRequestsInput{
 			SpotInstanceRequestIds: []*string{
 				spotRequest.SpotInstanceRequestId,
@@ -442,7 +441,7 @@ func (p awsSpotInstancePlugin) describeRequests(tags map[string]string, properti
 			if v, err := types.AnyValue(request); err == nil {
 				status = v
 			} else {
-				log.Warningln("cannot encode ec2Instance:", err)
+				log.Warn("cannot encode ec2Instance", "err", err)
 			}
 		}
 		descriptions = append(descriptions, instance.Description{
