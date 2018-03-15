@@ -244,19 +244,10 @@ func (c *collection) run(ctx context.Context) {
 
 	go func() {
 
-	loop:
 		for {
 
 			select {
 
-			case f, ok := <-c.model.Cleanup():
-				if !ok {
-					return
-				}
-				item := c.Collection.GetByFSM(f)
-				if item != nil {
-					c.Collection.Delete(item.Key)
-				}
 			case f, ok := <-c.model.Found():
 				if !ok {
 					return
@@ -283,64 +274,6 @@ func (c *collection) run(ctx context.Context) {
 						ID:      c.EventID(item.Key),
 						Message: "resource lost",
 					}.Init()
-				}
-
-			case f, ok := <-c.model.Destroy():
-				if !ok {
-					return
-				}
-
-				item := c.Collection.GetByFSM(f)
-				if item != nil {
-
-					accessor := c.accessors[item.Key]
-					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
-
-					// !!!! This actually is *always* nil in the case where the accessor
-					// section has been removed and we discover an instance that doesn't
-					// correspond to anything.
-					// The correct approach would be to use the *previous* version of the spec
-					if accessor == nil {
-						found, has := c.deleted[item.Key]
-						if has {
-							accessor = found
-						}
-					}
-
-					if accessor == nil {
-						log.Error("cannot find accessor for key", "key", item.Key)
-						continue loop
-					}
-
-					// TODO - call instancePlugin.Destroy
-					d := item.Data["instance"]
-					if d == nil {
-						log.Error("cannot find instance", "item", item.Key)
-						continue loop
-					}
-
-					if dd, is := d.(instance.Description); is {
-
-						log.Info("Destroy", "instanceID", dd.ID, "key", item.Key)
-						err := accessor.Destroy(dd.ID, instance.Termination)
-						log.Debug("destroy", "instanceID", dd.ID, "key", item.Key, "err", err)
-
-						if err != nil {
-							c.EventCh() <- event.Event{
-								Topic:   c.Topic(TopicErr),
-								Type:    event.Type("TerminateErr"),
-								ID:      c.EventID(item.Key),
-								Message: "destroying resource error",
-							}.Init().WithError(err)
-						} else {
-							c.EventCh() <- event.Event{
-								Topic:   c.Topic(TopicTerminate),
-								Type:    event.Type("Terminate"),
-								ID:      c.EventID(item.Key),
-								Message: "destroyed resource",
-							}.Init()
-						}
-					}
 				}
 
 			case lost, ok := <-lostInstances:

@@ -17,22 +17,10 @@ type Model struct {
 
 	inventory.Properties
 
-	instanceDestroyChan chan fsm.FSM
-	instanceFoundChan   chan fsm.FSM
-	instanceLostChan    chan fsm.FSM
-	cleanupChan         chan fsm.FSM
+	instanceFoundChan chan fsm.FSM
+	instanceLostChan  chan fsm.FSM
 
 	lock sync.RWMutex
-}
-
-// Cleanup is the channel to get signals to clean up
-func (m *Model) Cleanup() <-chan fsm.FSM {
-	return m.cleanupChan
-}
-
-// Destroy is the channel to get signals to destroy an instance
-func (m *Model) Destroy() <-chan fsm.FSM {
-	return m.instanceDestroyChan
 }
 
 // Found is the channel to get signals of instances that are found
@@ -78,10 +66,8 @@ func (m *Model) Stop() {
 		m.set.Stop()
 		m.clock.Stop()
 
-		close(m.instanceDestroyChan)
 		close(m.instanceFoundChan)
 		close(m.instanceLostChan)
-		close(m.cleanupChan)
 		m.set = nil
 	}
 
@@ -92,32 +78,21 @@ const (
 	// States
 	found fsm.Index = iota
 	lost
-	terminating
-	terminated
 
 	// Signals
 	resourceFound fsm.Signal = iota
 	resourceLost
-	obeserveError
-	terminate
-	terminateError
-	cleanup
 )
 
 var (
 	stateNames = map[fsm.Index]string{
-		found:       "FOUND",
-		lost:        "LOST",
-		terminating: "TERMINATING",
-		terminated:  "TERMINATED",
+		found: "FOUND",
+		lost:  "LOST",
 	}
 
 	signalNames = map[fsm.Signal]string{
-		resourceFound:  "resource_found",
-		resourceLost:   "resource_lost",
-		terminate:      "terminate",
-		cleanup:        "cleanup",
-		terminateError: "terminate_error",
+		resourceFound: "resource_found",
+		resourceLost:  "resource_lost",
 	}
 )
 
@@ -126,12 +101,10 @@ func BuildModel(properties inventory.Properties, options inventory.Options) (*Mo
 
 	log.Info("Build model", "properties", properties)
 	model := &Model{
-		Properties:          properties,
-		instanceDestroyChan: make(chan fsm.FSM, options.ChannelBufferSize),
-		instanceFoundChan:   make(chan fsm.FSM, options.ChannelBufferSize),
-		instanceLostChan:    make(chan fsm.FSM, options.ChannelBufferSize),
-		cleanupChan:         make(chan fsm.FSM, options.ChannelBufferSize),
-		tickSize:            1 * time.Second,
+		Properties:        properties,
+		instanceFoundChan: make(chan fsm.FSM, options.ChannelBufferSize),
+		instanceLostChan:  make(chan fsm.FSM, options.ChannelBufferSize),
+		tickSize:          1 * time.Second,
 	}
 
 	// find the max observation interval and set the model tick to be that
@@ -150,15 +123,10 @@ func BuildModel(properties inventory.Properties, options inventory.Options) (*Mo
 			Transitions: map[fsm.Signal]fsm.Index{
 				resourceFound: found,
 				resourceLost:  lost,
-				terminate:     terminating,
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				resourceLost: func(n fsm.FSM) error {
 					model.instanceLostChan <- n
-					return nil
-				},
-				terminate: func(n fsm.FSM) error {
-					model.instanceDestroyChan <- n
 					return nil
 				},
 			},
@@ -171,34 +139,6 @@ func BuildModel(properties inventory.Properties, options inventory.Options) (*Mo
 			Actions: map[fsm.Signal]fsm.Action{
 				resourceFound: func(n fsm.FSM) error {
 					model.instanceFoundChan <- n
-					return nil
-				},
-			},
-		},
-		fsm.State{
-			Index: terminating,
-			TTL:   fsm.Expiry{options.WaitBeforeRetryTerminate, terminate},
-			Transitions: map[fsm.Signal]fsm.Index{
-				terminate:      terminating,
-				terminateError: terminating,
-				resourceLost:   terminated,
-			},
-			Actions: map[fsm.Signal]fsm.Action{
-				terminate: func(n fsm.FSM) error {
-					model.instanceDestroyChan <- n
-					return nil
-				},
-			},
-		},
-		fsm.State{
-			Index: terminated,
-			TTL:   fsm.Expiry{options.WaitBeforeCleanup, cleanup},
-			Transitions: map[fsm.Signal]fsm.Index{
-				cleanup: terminated, // TODO - this is really unnecessary
-			},
-			Actions: map[fsm.Signal]fsm.Action{
-				cleanup: func(n fsm.FSM) error {
-					model.cleanupChan <- n
 					return nil
 				},
 			},
