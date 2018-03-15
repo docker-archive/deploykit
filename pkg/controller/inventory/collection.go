@@ -121,6 +121,7 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 	for name, accessList := range properties {
 
 		for _, access := range accessList {
+
 			copy := access
 
 			err = c.configureAccessor(spec, name, &copy)
@@ -128,9 +129,11 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 				return err
 			}
 
-			accessors[name] = &copy
+			key := types.Path([]string{name, copy.InstanceObserver.Plugin.String()})
+			accessors[key.String()] = &copy
 
-			log.Debug("Initialized INCLUDED accessor", "name", name, "spec", spec, "access", access, "V", debugV2)
+			log.Debug("Initialized INCLUDED accessor", "name", name, "key", key,
+				"spec", spec, "access", access, "V", debugV2)
 		}
 	}
 
@@ -153,8 +156,11 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 					return err
 				}
 
-				deleted[name] = &copy
-				log.Debug("Initialize DELETED accessor", "name", name, "spec", spec, "access", access, "V", debugV2)
+				key := types.Path([]string{name, copy.InstanceObserver.Plugin.String()})
+				deleted[key.String()] = &copy
+
+				log.Debug("Initialize DELETED accessor", "name", name, "key", key,
+					"spec", spec, "access", access, "V", debugV2)
 			}
 		}
 	}
@@ -193,6 +199,8 @@ func (c *collection) run(ctx context.Context) {
 	for n, a := range c.deleted {
 		accessors[n] = a
 	}
+
+	log.Info("starting up accessors", "len", len(accessors))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel

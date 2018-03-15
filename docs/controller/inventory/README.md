@@ -39,8 +39,37 @@ infrakit local inventory tail / --view 'str://{{.Type}} - {{.ID}} - {{.Message}}
 
 This will subscribe to all events from the top `/`.
 
-Now commit the configuration for resources:
+Now commit the configuration `inventory.yml` to start monitoring the resources.  This example
+watches the resources provisioned by the `resource` plugin via  the `az1/net`, `az2/net`, and `az1/disk`
+and `az2/disk` plugins:
 
 ```
-infrakit local mystack/inventory commit -y ./inventory.yml
+infrakit local mystack/inventory commit -y <(infrakit use inventory inventory.yml)
+```
+
+Now we can provision in az1:
+```
+infrakit local mystack/resource commit -y <(infrakit use inventory az1.yml)
+```
+
+in az2
+```
+infrakit local mystack/resource commit -y <(infrakit use inventory az2.yml)
+```
+
+The inventory controller will report events as resource show up and if you destroy resources
+you will see the 'gone' events.  The resource controller will detect that the resources
+have disappeared and reprovision them, at which point you will see events as well.
+
+The inventory controller also exposes all the known resources via the metatadata api. So to list:
+
+```
+infrakit local inventory/mystack-inventory  keys -al
+```
+
+And to see the values:
+
+```
+$ infrakit local inventory/mystack-inventory cat az2-resources/az2-net1/Properties/cidr
+10.20.200.0/24
 ```

@@ -143,6 +143,9 @@ func (s *Spec) SetSignalNames(v map[Signal]string) *Spec {
 // StateName returns the friendly name of the state, if defined
 func (s *Spec) StateName(i Index) (name string) {
 	name = fmt.Sprintf("%v", i)
+	if s == nil {
+		return
+	}
 	if s.stateNames == nil {
 		return
 	}
@@ -155,6 +158,10 @@ func (s *Spec) StateName(i Index) (name string) {
 // SignalName returns the friendly name of the signal, if defined
 func (s *Spec) SignalName(signal Signal) (name string) {
 	name = fmt.Sprintf("%v", signal)
+	if s == nil {
+		return
+	}
+
 	if s.signalNames == nil {
 		return
 	}
