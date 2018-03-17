@@ -2,7 +2,6 @@ package scope
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"
-	"github.com/docker/infrakit/pkg/discovery/local"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/plugin"
 	"github.com/docker/infrakit/pkg/spi/controller"
@@ -18,14 +17,19 @@ import (
 
 var log = logutil.New("module", "run/scope")
 
-// Nil is no scope
-var Nil = DefaultScope(func() discovery.Plugins {
-	d, err := local.NewPluginDiscovery()
-	if err != nil {
-		panic(err)
-	}
-	return d
-})
+// Nil is no scope -- no infrakit services
+
+type emptyscope int
+
+func (s emptyscope) Find(name plugin.Name) (*plugin.Endpoint, error) {
+	return nil, nil
+}
+
+func (s emptyscope) List() (map[string]*plugin.Endpoint, error) {
+	return map[string]*plugin.Endpoint{}, nil
+}
+
+var Nil = DefaultScope(func() discovery.Plugins { return emptyscope(1) })
 
 // Scope provides an environment in which the necessary plugins are available
 // for doing a unit of work.  The scope can be local or remote, namespaced,
