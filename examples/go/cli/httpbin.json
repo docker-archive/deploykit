@@ -1,0 +1,14 @@
+{{/* Render this document and then post to httpbin */}}
+{{/* Add this as a playbook command via infrakit playbook add test url-to-this-file */}}
+
+{{ $method := flag "http-method" "string" "POST" | prompt "http method?" "string" "POST" }}
+{{ $message := flag "message" "string" "" | prompt "message?" "string" "" }}
+
+{{ (cat `https://httpbin.org/` (lower $method) | nospace ) | var `url` }}
+{{ var `method` $method }}
+
+{{/* =% http (var `method`) (var `url`) `Content-Type=application/json`  %= */}}
+
+{
+  "message" : "{{ $message }}"
+}
