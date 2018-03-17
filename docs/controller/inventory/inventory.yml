@@ -1,0 +1,21 @@
+{{/* =% text %= */}}
+kind: inventory
+metadata:
+  name: mystack-inventory
+options:
+  ObserveInterval: 10s
+properties:
+  disks:
+    - plugin: az1/disk
+      labels:
+        infrakit_collection: az1-resources
+    - plugin: az2/disk
+      labels:
+        infrakit_collection: az2-resources
+  network:
+    - plugin: az1/net
+      labels:
+        infrakit_collection: az1-resources
+    - plugin: az2/net
+      labels:
+        infrakit_collection: az2-resources

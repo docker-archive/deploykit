@@ -9,9 +9,11 @@ import (
 )
 
 var (
-	log     = logutil.New("module", "controller/internal")
-	debugV  = logutil.V(500)
-	debugV2 = logutil.V(900)
+	log = logutil.New("module", "controller/internal")
+
+	// this is lower level, with 1 level up (the actual controllers), so give a scaling factor for the verbosity level
+	debugV  = logutil.V(2 * 500)
+	debugV2 = logutil.V(2 * 1000)
 )
 
 // ControlLoop gives status and means to stop the object

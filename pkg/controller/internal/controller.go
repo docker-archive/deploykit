@@ -210,6 +210,7 @@ func (c *Controller) Commit(operation controller.Operation, spec types.Spec) (ob
 	copy := spec
 	m, err = c.getManaged(&spec.Metadata, &copy)
 	if err != nil {
+		log.Error("err", "err", err)
 		return
 	}
 

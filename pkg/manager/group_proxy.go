@@ -87,7 +87,7 @@ func (m *manager) CommitGroup(grp group.Spec, pretend bool) (resp string, err er
 		return
 	}
 
-	retry := true
+	retry := false
 	<-m.queue("commit",
 		func() (bool, error) {
 			log.Debug("Manager CommitGroup", "spec", grp, "V", debugV)

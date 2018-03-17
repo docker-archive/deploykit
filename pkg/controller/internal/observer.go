@@ -60,10 +60,11 @@ var (
 
 // Validate validates the receiver with default values provided if some optional fields are not set.
 func (o *InstanceObserver) Validate(defaults *InstanceObserver) error {
-	if err := mergo.Merge(o, defaults); err != nil {
-		return err
+	if defaults != nil {
+		if err := mergo.Merge(o, defaults); err != nil {
+			return err
+		}
 	}
-
 	// critical checks
 	if o.Plugin.Zero() {
 		return fmt.Errorf("missing plugin name")
@@ -112,7 +113,7 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 		func() bool {
 			o.lock.RLock()
 			defer o.lock.RUnlock()
-			log.Debug("polling", "V", debugV2, "freed", o.paused)
+
 			return !o.paused
 		},
 		// This does the work
@@ -122,6 +123,12 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 			if err != nil {
 				return err
 			}
+
+			log.Debug("polling", "V", debugV2,
+				"freed", o.paused,
+				"plugin", o.Plugin,
+				"labels", o.Labels,
+				"observed", len(instances))
 
 			// send the current observations
 			select {
