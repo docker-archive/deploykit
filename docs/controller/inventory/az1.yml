@@ -1,0 +1,125 @@
+{{/* =% text %= */}}
+kind: resource
+metadata:
+  name: az1-resources
+properties:
+  az1-net1:
+    plugin: az1/net
+    labels:
+      az: az1
+      type: network
+    ObserveInterval: 1s                               # optional - specified here to control polling interval
+    KeySelector: \{\{.Tags.infrakit_instance\}\}      # optional specified here to control key extraction
+    Properties:
+      cidr: 10.20.100.0/24
+      gateway: 10.20.0.1
+  az1-disk0:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-net1/ID` }}
+      depname: {{ depend `az1-net1/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 1TB
+  az1-disk1:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk0/ID` }}
+      depname: {{ depend `az1-disk0/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 2TB
+  az1-disk2:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk1/ID` }}
+      depname: {{ depend `az1-disk1/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 3TB
+  az1-disk3:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk2/ID` }}
+      depname: {{ depend `az1-disk2/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 4TB
+  az1-disk4:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk3/ID` }}
+      depname: {{ depend `az1-disk3/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 5TB
+  az1-disk5:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk4/ID` }}
+      depname: {{ depend `az1-disk4/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 6TB
+  az1-disk6:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk5/ID` }}
+      depname: {{ depend `az1-disk5/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 7TB
+  az1-disk7:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk6/ID` }}
+      depname: {{ depend `az1-disk6/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 8TB
+  az1-disk8:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk7/ID` }}
+      depname: {{ depend `az1-disk7/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 9TB
+  az1-disk9:
+    plugin: az1/disk
+    labels:
+      az: az1
+      type: storage
+    Properties:
+      dep: {{ depend `az1-disk8/ID` }}
+      depname: {{ depend `az1-disk8/Tags/infrakit_instance` }}
+      gw: {{ depend `az1-net1/Properties/gateway` }}
+      fs: ext4
+      size: 10TB

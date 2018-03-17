@@ -124,7 +124,7 @@ func (m controllerAdapter) Commit(op controller.Operation, spec types.Spec) (obj
 		return
 	}
 
-	retry := true
+	retry := false
 	<-m.manager.queue("commit",
 		func() (bool, error) {
 			object, err = m.backend.Commit(op, spec)

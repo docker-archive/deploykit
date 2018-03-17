@@ -4,45 +4,55 @@ import (
 	"fmt"
 )
 
+// With returns a spec with given state names and signal names
+func With(stateNames map[Index]string, signalNames map[Signal]string) *Spec {
+	spec := newSpec()
+	return spec.SetStateNames(stateNames).SetSignalNames(signalNames)
+}
+
 // Define performs basic validation, consistency checks and returns a compiled spec.
-func Define(s State, more ...State) (spec *Spec, err error) {
-
-	spec = newSpec()
-
+func (s *Spec) Define(state State, more ...State) (*Spec, error) {
 	states := map[Index]State{
-		s.Index: s,
+		state.Index: state,
 	}
 
-	for _, s := range more {
-		if _, has := states[s.Index]; has {
-			err = ErrDuplicateState(s.Index)
-			return
+	for _, st := range more {
+		if _, has := states[st.Index]; has {
+			err := ErrDuplicateState(st.Index)
+			return s, err
 		}
-		states[s.Index] = s
+		states[st.Index] = st
 	}
 
 	// check referential integrity
-	signals, err := compile(states)
+	signals, err := s.compile(states)
 	if err != nil {
-		return
+		return s, err
 	}
 
-	spec.states = states
-	spec.signals = signals
-	return
+	s.states = states
+	s.signals = signals
+	return s, err
 }
 
-func compile(m map[Index]State) (map[Signal]Signal, error) {
+// Define performs basic validation, consistency checks and returns a compiled spec.
+func Define(s State, more ...State) (spec *Spec, err error) {
+	spec = newSpec()
+	return spec.Define(s, more...)
+}
+
+func (s *Spec) compile(m map[Index]State) (map[Signal]Signal, error) {
 
 	signals := map[Signal]Signal{}
 
-	for _, s := range m {
+	for _, st := range m {
 		for _, transfer := range []map[Signal]Index{
-			s.Transitions,
-			s.Errors,
+			st.Transitions,
+			st.Errors,
 		} {
 			for signal, next := range transfer {
 				if _, has := m[next]; !has {
+					log.Error("unknown state", "next", s.StateName(next))
 					return nil, ErrUnknownState(next)
 				}
 				signals[signal] = signal
@@ -52,12 +62,13 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 
 	// all signals must be known here
 
-	for _, s := range m {
+	for _, st := range m {
 		// Check all the signal references in Actions must be in transitions
-		for signal, action := range s.Actions {
-			if _, has := s.Transitions[signal]; !has {
-				log.Warn("actions has signal that's not in state's transitions", "state", s.Index, "signal", signal)
-				return nil, ErrUnknownTransition{Signal: signal, State: s.Index}
+		for signal, action := range st.Actions {
+			if _, has := st.Transitions[signal]; !has {
+				log.Error("actions has signal that's not in state's transitions",
+					"state", s.StateName(st.Index), "signal", s.SignalName(signal))
+				return nil, ErrUnknownTransition{spec: s, Signal: signal, State: st.Index}
 			}
 
 			if action == nil {
@@ -65,32 +76,34 @@ func compile(m map[Index]State) (map[Signal]Signal, error) {
 			}
 
 			if _, has := signals[signal]; !has {
-				return nil, ErrUnknownSignal{Signal: signal, State: s.Index}
+				return nil, ErrUnknownSignal{Signal: signal, State: st.Index}
 			}
 		}
 	}
 
 	// what's raised in the TTL and in the Visit limit must be defined as well
 
-	for _, s := range m {
-		if s.TTL.TTL > 0 {
-			if _, has := s.Transitions[s.TTL.Raise]; !has {
-				log.Warn("expiry raises signal that's not in state's transitions", "state", s.Index, "TTL", s.TTL)
-				return nil, ErrUnknownSignal{Signal: s.TTL.Raise, State: s.Index}
+	for _, st := range m {
+		if st.TTL.TTL > 0 {
+			if _, has := st.Transitions[st.TTL.Raise]; !has {
+				log.Error("expiry raises signal that's not in state's transitions",
+					"state", s.StateName(st.Index), "TTL", st.TTL)
+				return nil, ErrUnknownSignal{spec: s, Signal: st.TTL.Raise, State: st.Index}
 			}
 
 			// register as valid signal
-			signals[s.TTL.Raise] = s.TTL.Raise
+			signals[st.TTL.Raise] = st.TTL.Raise
 
 		}
-		if s.Visit.Value > 0 {
-			if _, has := s.Transitions[s.Visit.Raise]; !has {
-				log.Warn("visit limit raises signal that's not in state's transitions", "state", s.Index, "visit", s.Visit)
-				return nil, ErrUnknownSignal{Signal: s.Visit.Raise, State: s.Index}
+		if st.Visit.Value > 0 {
+			if _, has := st.Transitions[st.Visit.Raise]; !has {
+				log.Error("visit limit raises signal that's not in state's transitions",
+					"state", s.StateName(st.Index), "visit", st.Visit)
+				return nil, ErrUnknownSignal{spec: s, Signal: st.Visit.Raise, State: st.Index}
 			}
 
 			// register as valid signal
-			signals[s.Visit.Raise] = s.Visit.Raise
+			signals[st.Visit.Raise] = st.Visit.Raise
 		}
 	}
 
@@ -130,6 +143,9 @@ func (s *Spec) SetSignalNames(v map[Signal]string) *Spec {
 // StateName returns the friendly name of the state, if defined
 func (s *Spec) StateName(i Index) (name string) {
 	name = fmt.Sprintf("%v", i)
+	if s == nil {
+		return
+	}
 	if s.stateNames == nil {
 		return
 	}
@@ -142,6 +158,10 @@ func (s *Spec) StateName(i Index) (name string) {
 // SignalName returns the friendly name of the signal, if defined
 func (s *Spec) SignalName(signal Signal) (name string) {
 	name = fmt.Sprintf("%v", signal)
+	if s == nil {
+		return
+	}
+
 	if s.signalNames == nil {
 		return
 	}
