@@ -1,0 +1,6 @@
+# This is an index file for a playbook module that contains
+# multiple commands
+
+httpbin : httpbin.json
+
+lines : lines.sh
