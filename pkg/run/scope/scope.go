@@ -29,6 +29,7 @@ func (s emptyscope) List() (map[string]*plugin.Endpoint, error) {
 	return map[string]*plugin.Endpoint{}, nil
 }
 
+// Nil is a scope that points to nothing, no plugins can be accessed.
 var Nil = DefaultScope(func() discovery.Plugins { return emptyscope(1) })
 
 // Scope provides an environment in which the necessary plugins are available
