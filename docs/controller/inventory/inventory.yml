@@ -3,7 +3,7 @@ kind: inventory
 metadata:
   name: mystack-inventory
 options:
-  WaitBeforeRetryTerminate: 1
+  ObserveInterval: 10s
 properties:
   disks:
     - plugin: az1/disk

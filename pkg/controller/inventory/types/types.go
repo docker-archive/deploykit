@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
-	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/depends"
 	"github.com/docker/infrakit/pkg/spi/controller"
@@ -55,10 +54,8 @@ type Properties map[string][]internal.InstanceAccess
 
 // ModelProperties contain fsm tuning parameters
 type ModelProperties struct {
-	TickUnit                 types.Duration
-	WaitBeforeRetryTerminate fsm.Tick
-	WaitBeforeCleanup        fsm.Tick
-	ChannelBufferSize        int
+	TickUnit          types.Duration
+	ChannelBufferSize int
 }
 
 // Validate validates the input properties
@@ -68,6 +65,7 @@ func (p Properties) Validate(ctx context.Context) error {
 
 // Options is the controller options that is used at start up of the process.  It's one-time
 type Options struct {
+	*internal.InstanceObserver `json:",inline" yaml:",inline"`
 
 	// PluginRetryInterval is the interval for retrying to connect to the plugins
 	PluginRetryInterval types.Duration

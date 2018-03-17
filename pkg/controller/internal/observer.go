@@ -60,10 +60,11 @@ var (
 
 // Validate validates the receiver with default values provided if some optional fields are not set.
 func (o *InstanceObserver) Validate(defaults *InstanceObserver) error {
-	if err := mergo.Merge(o, defaults); err != nil {
-		return err
+	if defaults != nil {
+		if err := mergo.Merge(o, defaults); err != nil {
+			return err
+		}
 	}
-
 	// critical checks
 	if o.Plugin.Zero() {
 		return fmt.Errorf("missing plugin name")

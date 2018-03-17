@@ -239,7 +239,7 @@ func (c *collection) run(ctx context.Context) {
 		}(k, a)
 
 		a.Start()
-		log.Debug("accessor started", "key", k)
+		log.Debug("accessor started", "key", k, "observeInterval", a.ObserveInterval)
 	}
 
 	go func() {
@@ -289,7 +289,7 @@ func (c *collection) run(ctx context.Context) {
 				}
 
 				// Update the view in the metadata plugin
-				c.MetadataGone(accessor.KeyOf, lost.instances)
+				c.MetadataGone(keyOf(lost.name, accessor.KeyOf), lost.instances)
 
 				for _, n := range lost.instances {
 					k, err := accessor.KeyOf(n)
@@ -360,11 +360,23 @@ func (c *collection) run(ctx context.Context) {
 					item.Data["instance"] = n
 				}
 
-				c.MetadataExport(accessor.KeyOf, export)
+				c.MetadataExport(keyOf(found.name, accessor.KeyOf), export)
 			}
 		}
 	}()
 
+}
+
+type keyofFunc func(instance.Description) (string, error)
+
+func keyOf(n string, keyof keyofFunc) keyofFunc {
+	return func(i instance.Description) (string, error) {
+		k, err := keyof(i)
+		if err != nil {
+			return k, err
+		}
+		return types.PathFromString(n).JoinString(k).String(), nil
+	}
 }
 
 func (c *collection) stop() error {
@@ -395,7 +407,7 @@ func (c *collection) configureAccessor(spec types.Spec, name string, access *int
 		access.Labels = map[string]string{}
 	}
 
-	err := access.InstanceObserver.Validate(DefaultAccessProperties)
+	err := access.InstanceObserver.Validate(c.options.InstanceObserver)
 	if err != nil {
 		return err
 	}

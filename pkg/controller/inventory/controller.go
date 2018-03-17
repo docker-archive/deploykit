@@ -6,7 +6,6 @@ import (
 
 	"github.com/docker/infrakit/pkg/controller/internal"
 	inventory "github.com/docker/infrakit/pkg/controller/inventory/types"
-	"github.com/docker/infrakit/pkg/fsm"
 	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/spi/controller"
@@ -23,6 +22,11 @@ var (
 
 	// DefaultOptions return an Options with default values filled in.
 	DefaultOptions = inventory.Options{
+		InstanceObserver: &internal.InstanceObserver{
+			ObserveInterval: types.Duration(1 * time.Second),
+			KeySelector: template.EscapeString(fmt.Sprintf(`{{.Tags.%s}}/{{.Tags.%s}}`,
+				internal.CollectionLabel, internal.InstanceLabel)),
+		},
 		PluginRetryInterval:  types.Duration(1 * time.Second),
 		MinChannelBufferSize: 10,
 		ModelProperties:      DefaultModelProperties,
@@ -30,21 +34,12 @@ var (
 
 	// DefaultModelProperties is the default properties for the fsm model
 	DefaultModelProperties = inventory.ModelProperties{
-		TickUnit:                 types.FromDuration(1 * time.Second),
-		WaitBeforeRetryTerminate: fsm.Tick(10),
-		WaitBeforeCleanup:        fsm.Tick(10),
-		ChannelBufferSize:        10,
+		TickUnit:          types.FromDuration(1 * time.Second),
+		ChannelBufferSize: 10,
 	}
 
 	// DefaultProperties is the default properties for the controller, this is per collection / commit
 	DefaultProperties = inventory.Properties{}
-
-	// DefaultAccessProperties specifies some default parameters
-	DefaultAccessProperties = &internal.InstanceObserver{
-		ObserveInterval: types.Duration(1 * time.Second),
-		KeySelector: template.EscapeString(fmt.Sprintf(`{{.Tags.%s}}/{{.Tags.%s}}`,
-			internal.CollectionLabel, internal.InstanceLabel)),
-	}
 )
 
 // Components contains a set of components in this controller.
