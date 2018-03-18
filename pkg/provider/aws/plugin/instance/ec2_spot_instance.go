@@ -436,19 +436,20 @@ func (p awsSpotInstancePlugin) describeRequests(tags map[string]string, properti
 			}
 		}
 
-		var status *types.Any
+		var state *types.Any
 		if properties {
 			if v, err := types.AnyValue(request); err == nil {
-				status = v
+				state = v
 			} else {
 				log.Warn("cannot encode ec2Instance", "err", err)
 			}
 		}
+
 		descriptions = append(descriptions, instance.Description{
 			ID:         instance.ID(*request.SpotInstanceRequestId),
 			LogicalID:  (*instance.LogicalID)(lID),
 			Tags:       tags,
-			Properties: status,
+			Properties: state,
 		})
 	}
 	return descriptions, nil

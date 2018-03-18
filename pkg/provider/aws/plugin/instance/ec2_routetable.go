@@ -110,7 +110,21 @@ func (p awsRouteTablePlugin) DescribeInstances(labels map[string]string, propert
 				tags[*tag.Key] = *tag.Value
 			}
 		}
-		descriptions = append(descriptions, instance.Description{ID: instance.ID(*routeTable.RouteTableId), Tags: tags})
+
+		var state *types.Any
+		if properties {
+			if any, err := types.AnyValue(routeTable); err == nil {
+				state = any
+			} else {
+				log.Warn("cannot encode ec2RouteTable", "err", err, "routeTable", routeTable)
+			}
+		}
+
+		descriptions = append(descriptions,
+			instance.Description{
+				ID:         instance.ID(*routeTable.RouteTableId),
+				Tags:       tags,
+				Properties: state})
 	}
 	return descriptions, nil
 }

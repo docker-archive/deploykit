@@ -392,10 +392,10 @@ func (p awsInstancePlugin) describeInstances(tags map[string]string, properties 
 				}
 			}
 
-			var status *types.Any
+			var state *types.Any
 			if properties {
 				if v, err := types.AnyValue(ec2Instance); err == nil {
-					status = v
+					state = v
 				} else {
 					log.Warn("cannot encode ec2Instance:", "err", err)
 				}
@@ -404,7 +404,7 @@ func (p awsInstancePlugin) describeInstances(tags map[string]string, properties 
 				ID:         instance.ID(*ec2Instance.InstanceId),
 				LogicalID:  (*instance.LogicalID)(ec2Instance.PrivateIpAddress),
 				Tags:       tags,
-				Properties: status,
+				Properties: state,
 			})
 		}
 	}

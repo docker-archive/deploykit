@@ -88,7 +88,21 @@ func (p awsVpcPlugin) DescribeInstances(labels map[string]string, properties boo
 				tags[*tag.Key] = *tag.Value
 			}
 		}
-		descriptions = append(descriptions, instance.Description{ID: instance.ID(*vpc.VpcId), Tags: tags})
+
+		var state *types.Any
+		if properties {
+			if any, err := types.AnyValue(vpc); err == nil {
+				state = any
+			} else {
+				log.Warn("cannot encode ec2Vpc", "err", err, "vpc", vpc)
+			}
+		}
+
+		descriptions = append(descriptions,
+			instance.Description{
+				ID:         instance.ID(*vpc.VpcId),
+				Tags:       tags,
+				Properties: state})
 	}
 	return descriptions, nil
 }

@@ -24,8 +24,8 @@ func NewSecurityGroupPlugin(client ec2iface.EC2API, namespaceTags map[string]str
 
 type createSecurityGroupRequest struct {
 	CreateSecurityGroupInput           ec2.CreateSecurityGroupInput
-	AuthorizeSecurityGroupEgressInput  *ec2.AuthorizeSecurityGroupEgressInput
-	AuthorizeSecurityGroupIngressInput *ec2.AuthorizeSecurityGroupIngressInput
+	AuthorizeSecurityGroupEgressInput  []*ec2.AuthorizeSecurityGroupEgressInput
+	AuthorizeSecurityGroupIngressInput []*ec2.AuthorizeSecurityGroupIngressInput
 	Tags                               map[string]string
 }
 
@@ -49,16 +49,16 @@ func (p awsSecurityGroupPlugin) Provision(spec instance.Spec) (*instance.ID, err
 	}
 	id := instance.ID(*output.GroupId)
 
-	if request.AuthorizeSecurityGroupEgressInput != nil {
-		request.AuthorizeSecurityGroupEgressInput.GroupId = output.GroupId
-		if _, err := p.client.AuthorizeSecurityGroupEgress(request.AuthorizeSecurityGroupEgressInput); err != nil {
+	for _, egressInput := range request.AuthorizeSecurityGroupEgressInput {
+		egressInput.GroupId = output.GroupId
+		if _, err := p.client.AuthorizeSecurityGroupEgress(egressInput); err != nil {
 			return nil, fmt.Errorf("AuthorizeSecurityGroupEgress failed: %s", err)
 		}
 	}
 
-	if request.AuthorizeSecurityGroupIngressInput != nil {
-		request.AuthorizeSecurityGroupIngressInput.GroupId = output.GroupId
-		if _, err := p.client.AuthorizeSecurityGroupIngress(request.AuthorizeSecurityGroupIngressInput); err != nil {
+	for _, ingressInput := range request.AuthorizeSecurityGroupIngressInput {
+		ingressInput.GroupId = output.GroupId
+		if _, err := p.client.AuthorizeSecurityGroupIngress(ingressInput); err != nil {
 			return nil, fmt.Errorf("AuthorizeSecurityGroupIngress failed: %s", err)
 		}
 	}
@@ -105,7 +105,22 @@ func (p awsSecurityGroupPlugin) DescribeInstances(labels map[string]string, prop
 				tags[*tag.Key] = *tag.Value
 			}
 		}
-		descriptions = append(descriptions, instance.Description{ID: instance.ID(*securityGroup.GroupId), Tags: tags})
+
+		var state *types.Any
+		if properties {
+			if any, err := types.AnyValue(securityGroup); err == nil {
+				state = any
+			} else {
+				log.Warn("cannot encode ec2SecurityGroup", "err", err, "sg", securityGroup)
+			}
+		}
+
+		descriptions = append(descriptions,
+			instance.Description{
+				ID:         instance.ID(*securityGroup.GroupId),
+				Tags:       tags,
+				Properties: state,
+			})
 	}
 	return descriptions, nil
 }

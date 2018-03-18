@@ -23,8 +23,9 @@ func NewSubnetPlugin(client ec2iface.EC2API, namespaceTags map[string]string) in
 }
 
 type createSubnetRequest struct {
-	Tags              map[string]string
-	CreateSubnetInput ec2.CreateSubnetInput
+	Tags                  map[string]string
+	CreateSubnetInput     ec2.CreateSubnetInput
+	RouteTableAssociation *ec2.RouteTableAssociation
 }
 
 func (p awsSubnetPlugin) Validate(req *types.Any) error {
@@ -42,6 +43,22 @@ func (p awsSubnetPlugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		return nil, fmt.Errorf("CreateSubnet failed: %s", err)
 	}
 	id := instance.ID(*output.Subnet.SubnetId)
+
+	err = ec2CreateTags(p.client, id, request.Tags, spec.Tags, p.namespaceTags)
+	if err != nil {
+		return nil, err
+	}
+
+	if request.RouteTableAssociation != nil {
+		associateOutput, err := p.client.AssociateRouteTable(&ec2.AssociateRouteTableInput{
+			RouteTableId: request.RouteTableAssociation.RouteTableId,
+			SubnetId:     output.Subnet.SubnetId,
+		})
+		if err != nil {
+			return nil, err
+		}
+		spec.Tags["routeTableAssociation"] = *associateOutput.AssociationId
+	}
 
 	return &id, ec2CreateTags(p.client, id, request.Tags, spec.Tags, p.namespaceTags)
 }
@@ -93,7 +110,22 @@ func (p awsSubnetPlugin) DescribeInstances(labels map[string]string, properties 
 				tags[*tag.Key] = *tag.Value
 			}
 		}
-		descriptions = append(descriptions, instance.Description{ID: instance.ID(*subnet.SubnetId), Tags: tags})
+
+		var state *types.Any
+		if properties {
+			if any, err := types.AnyValue(subnet); err == nil {
+				state = any
+			} else {
+				log.Warn("cannot encode ec2Subnet", "err", err, "subnet", subnet)
+			}
+		}
+
+		descriptions = append(descriptions,
+			instance.Description{
+				ID:         instance.ID(*subnet.SubnetId),
+				Tags:       tags,
+				Properties: state,
+			})
 	}
 	return descriptions, nil
 }
