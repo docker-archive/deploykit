@@ -5,13 +5,14 @@
 {{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
 {{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
 {{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
-{{ $privateIp := param "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "172.31.20.100" }}
+{{ $privateIp := param "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" (metadata `inventory/mystack/networking/aws/ec2-subnet/myproject-subnet1/Properties/CidrBlock`) }}
 
 
 {{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
-{{ $az := param "az" "string" "availability zone" | prompt "Availability zone?" "string" "eu-central-1b"}}
-{{ $subnetId := param "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" "subnet-11b8376a" }}
-{{ $securityGroupId := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" "sg-975500fe" }}
+{{ $az := param "az" "string" "availability zone" | prompt "Availability zone?" "string" (metadata `inventory/mystack/networking/aws/ec2-subnet/myproject-subnet1/Properties/AvailabilityZone`)}}
+{{ $subnetId := param "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" (metadata `inventory/mystack/networking/aws/ec2-subnet/myproject-subnet1/Properties/SubnetId`) }}
+{{ $securityGroupID := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" (metadata `inventory/mystack/networking/aws/ec2-securitygroup/myproject-sg1/Properties/GroupId`) }}
+{{ $name := param "name" "string" "Host name" | prompt "Host name?" "string" (cat $project `-` (randAlphaNum 8) | nospace ) }}
 
 Tags:
   infrakit.scope: {{ $project }}
@@ -27,6 +28,9 @@ Init: |
   ln -s /usr/lib/go-1.9/bin/go /usr/local/bin/go
 
 Properties:
+  Tags:
+    Name: {{ $name }}
+    infrakit.user: {{ $user }}
   RunInstancesInput:
     BlockDeviceMappings: null
     DisableApiTermination: null
@@ -42,7 +46,7 @@ Properties:
       DeleteOnTermination: true
       DeviceIndex: 0
       Groups:
-      - {{ $securityGroupId }}
+      - {{ $securityGroupID }}
       NetworkInterfaceId: null
       SubnetId: {{ $subnetId }}
     Placement:
@@ -52,5 +56,3 @@ Properties:
     RamdiskId: null
     SubnetId: null
     UserData: null
-  Tags:
-    infrakit.user: {{ $user }}

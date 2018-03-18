@@ -1,0 +1,24 @@
+{{/* Input to create instance using the AWS instance plugin */}}
+{{/* =% instanceProvision `aws/ec2-vpc` %= */}}
+
+{{ $user := param "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+
+{{ $cidr := param "cidr" "string" "CIDR Block" | prompt "CIDR block?" "string" "10.0.0.0/16" }}
+
+Tags:
+  infrakit.scope: {{ $project }}
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.user: {{ $user }}
+
+Properties:
+  Tags:
+    Name: {{ $project }}-vpc
+    infrakit.user: {{ $user }}
+  CreateVpcInput:
+    CidrBlock: {{ $cidr }}
+  ModifyVpcAttributeInputs:
+    - EnableDnsSupport :
+        Value: true
+    - EnableDnsHostnames :
+        Value: true

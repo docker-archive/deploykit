@@ -1,0 +1,31 @@
+{{/* Input to create instance using the AWS instance plugin */}}
+{{/* =% instanceProvision `aws/ec2-securitygroup` %= */}}
+
+{{ $user := param "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+
+{{ $vpcID := param "vpcID" "string" "VPC ID" | prompt "VPC ID?" "string" }}
+{{ $name := param "name" "string" "SG name" | prompt "SecurityGroup name?" "string" "sg-1" }}
+
+Tags:
+  infrakit.scope: {{ $project }}
+  infrakit.created: {{ now | htmlDate }}
+  infrakit.user: {{ $user }}
+
+Properties:
+  Tags:
+    Name: {{ $project }}-{{ $name }}
+    infrakit.user: {{ $user }}
+  CreateSecurityGroupInput:
+    VpcId : {{ $vpcID }}
+    GroupName: {{ $name }}
+    Description: ssh-sg
+  AuthorizeSecurityGroupIngressInput:
+    - CidrIp : 0.0.0.0/0
+      IpProtocol: "tcp"
+      FromPort: 22
+      ToPort: 22
+    - CidrIp : 0.0.0.0/0
+      IpProtocol: "tcp"
+      FromPort: 24864
+      ToPort: 24864

@@ -7,6 +7,7 @@
 {{ $project := flag "project" "string" "project name" | prompt "Project?" "string" "myproject" }}
 
 {{ if $clearState }}
+echo "Clear local state from previous runs"
 rm -rf ~/.infrakit/plugins/* # remove sockets, pid files, etc.
 rm -rf ~/.infrakit/configs/global.config # for file based manager
 # Since we are using file based leader detection, write the default name (manager1) to the leader file.
@@ -32,8 +33,9 @@ INFRAKIT_AWS_REGION={{ $region }} \
 INFRAKIT_AWS_STACK_NAME={{ $project }} \
 INFRAKIT_AWS_NAMESPACE_TAGS="infrakit.scope={{ $project }}" \
 INFRAKIT_AWS_MONITOR_POLL_INTERVAL=5s \
-infrakit plugin start manager:mystack vars group resource aws \
-	 --log 5 --log-stack --log-debug-V 500 \
+INFRAKIT_MANAGER_CONTROLLERS=resource,inventory \
+infrakit plugin start manager:mystack vars group resource inventory aws \
+	 --log 5 --log-stack --log-debug-V 1000 \
+	 --log-debug-match module=controller/inventory \
 	 --log-debug-match module=controller/resource \
-	 --log-debug-match module=controller/internal \
 	 --log-debug-match module=provider/aws \

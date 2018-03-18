@@ -11,7 +11,8 @@
 {{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
 {{ $az := param "az" "string" "availability zone" | prompt "Availability zone?" "string" "eu-central-1b"}}
 {{ $subnetId := param "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" "subnet-11b8376a" }}
-{{ $securityGroupId := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" "sg-975500fe" }}
+{{ $securityGroupID := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" "sg-975500fe" }}
+{{ $name := param "name" "string" "Host name" | prompt "Host name?" "string" (randAlphaNum 8) }}
 
 Tags:
   infrakit.scope: {{ $project }}
@@ -27,6 +28,9 @@ Init: |
   ln -s /usr/lib/go-1.9/bin/go /usr/local/bin/go
 
 Properties:
+  Tags:
+    Name: {{ $name }}
+    infrakit.user: {{ $user }}
   RequestSpotInstancesInput:
     LaunchSpecification:
       ImageId: {{ $imageId }}
@@ -37,7 +41,7 @@ Properties:
         DeleteOnTermination: true
         DeviceIndex: 0
         Groups:
-        - {{ $securityGroupId }}
+        - {{ $securityGroupID }}
         NetworkInterfaceId: null
         PrivateIpAddress: {{ $privateIp  }}
         PrivateIpAddresses: null
