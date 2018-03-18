@@ -5,14 +5,26 @@
 {{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
 {{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
 {{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
-{{ $privateIp := param "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" (metadata `inventory/mystack/networking/aws/ec2-subnet/myproject-subnet1/Properties/CidrBlock`) }}
 
+{{ $name := param "name" "string" "Host name" | prompt "Host name?" "string" (cat $project `-` (randAlphaNum 8) | nospace ) }}
 
 {{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
-{{ $az := param "az" "string" "availability zone" | prompt "Availability zone?" "string" (metadata `inventory/mystack/networking/aws/ec2-subnet/myproject-subnet1/Properties/AvailabilityZone`)}}
-{{ $subnetId := param "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" (metadata `inventory/mystack/networking/aws/ec2-subnet/myproject-subnet1/Properties/SubnetId`) }}
-{{ $securityGroupID := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" (metadata `inventory/mystack/networking/aws/ec2-securitygroup/myproject-sg1/Properties/GroupId`) }}
-{{ $name := param "name" "string" "Host name" | prompt "Host name?" "string" (cat $project `-` (randAlphaNum 8) | nospace ) }}
+
+{{ $subnet := param "subnet" "string" "subnet" | prompt "Subnet?" "string" "subnet1" }}
+{{ $subnetKey := list `inventory` $project `networking/aws/ec2-subnet` (list $project $subnet | join `-`) `Properties` | join `/` }}
+
+{{ $azKey := list $subnetKey `AvailabilityZone` | join `/` }}
+{{ $az := metadata $azKey }}
+
+{{ $subnetIdKey := list $subnetKey `SubnetId` | join `/` }}
+{{ $subnetId := metadata $subnetIdKey }}
+
+{{ $cidrBlockKey := list $subnetKey `CidrBlock` | join `/` }}
+{{ $privateIp := param "private-ip" "string" "IP" | prompt "Private IP address?" "string" (metadata $cidrBlockKey) }}
+
+{{ $securityGroupIdKey := list `inventory` $project `networking/aws/ec2-securitygroup` (list $project `sg1` | join `-`) `Properties/GroupId` | join `/` }}
+
+{{ $securityGroupID := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" (metadata $securityGroupIdKey) }}
 
 Tags:
   infrakit.scope: {{ $project }}

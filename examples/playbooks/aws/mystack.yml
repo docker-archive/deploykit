@@ -12,7 +12,7 @@
 
 kind: resource
 metadata:
-  name: mystack
+  name: {{ $project }}
 options:
   ObserveInterval: 5s
 properties:

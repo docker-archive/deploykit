@@ -4,7 +4,7 @@
 
 kind: inventory
 metadata:
-  name: mystack
+  name: {{ $project }}
 options:
   ObserveInterval: 5s
   KeySelector: "\\{\\{.Tags.Name\\}\\}"
