@@ -4,7 +4,6 @@
 
 {{ $profile := flag "aws-cred-profile" "string" "Profile name" | prompt "Profile for your .aws/credentials?" "string" "default" }}
 {{ $region := flag "region" "string" "aws region" | prompt "Region?" "string" "eu-central-1"}}
-{{ $project := flag "project" "string" "project name" | prompt "Project?" "string" "myproject" }}
 
 {{ if $clearState }}
 echo "Clear local state from previous runs"
@@ -25,14 +24,14 @@ if [ $FOUND = "false" ]; then
   exit 1
 fi
 
+{{ $namespace := env `USER` }}
 {{ echo "Found your credential for profile" $profile }}
+{{ echo "All resources created will be namespaced to " $namespace }}
 
 AWS_ACCESS_KEY_ID={{ $creds.aws_access_key_id }} \
 AWS_SECRET_ACCESS_KEY={{ $creds.aws_secret_access_key }} \
 INFRAKIT_AWS_REGION={{ $region }} \
-INFRAKIT_AWS_STACK_NAME={{ $project }} \
-INFRAKIT_AWS_NAMESPACE_TAGS="infrakit.scope={{ $project }}" \
-INFRAKIT_AWS_MONITOR_POLL_INTERVAL=5s \
+INFRAKIT_AWS_NAMESPACE_TAGS="infrakit.namespace={{ $namespace }}" \
 INFRAKIT_MANAGER_CONTROLLERS=resource,inventory \
 infrakit plugin start manager:mystack vars group resource inventory aws \
 	 --log 5 --log-stack --log-debug-V 1000 \
