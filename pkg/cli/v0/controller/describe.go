@@ -7,6 +7,7 @@ import (
 
 	"github.com/docker/infrakit/pkg/cli"
 	"github.com/docker/infrakit/pkg/plugin"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/cobra"
 )
@@ -20,6 +21,8 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 	describe.Flags().AddFlagSet(services.OutputFlags)
 
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
+	objectsOnly := describe.Flags().BoolP("objects", "o", false, "True to show objects only")
+	view := describe.Flags().StringP("view", "v", "{{.instance.ID}}", "View template for collection object states")
 
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 
@@ -47,17 +50,65 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 
 		return services.Output(os.Stdout, objects,
 			func(w io.Writer, v interface{}) error {
-				fmt.Printf("%-10s  %-15s  %-15s\n", "KIND", "NAME", "ID")
+
+				if !*objectsOnly {
+					fmt.Printf("%-10s  %-15s  %-15s\n", "KIND", "NAME", "ID")
+					for _, o := range objects {
+
+						id := "-"
+						if o.Spec.Metadata.Identity != nil {
+							id = o.Spec.Metadata.Identity.ID
+						}
+
+						fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Kind, o.Spec.Metadata.Name, id)
+					}
+					return nil
+				}
+
+				render, err := services.Scope.TemplateEngine("str://"+*view, template.Options{})
+				if err != nil {
+					return err
+				}
+
+				// show objects only from spec.State
+				fmt.Printf("%-10s  %-15s  %-15s\n", "KEY", "STATE", "DATA")
 				for _, o := range objects {
 
-					id := "-"
-					if o.Spec.Metadata.Identity != nil {
-						id = o.Spec.Metadata.Identity.ID
+					if o.State == nil {
+						fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Metadata.Name, "-", "-")
+						continue
 					}
 
-					fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Kind, o.Spec.Metadata.Name, id)
+					// structured form -- controller/internal/Item
+					type fsm struct {
+						Key   string
+						State string
+						Data  map[string]interface{}
+					}
+
+					list := []fsm{}
+					err := o.State.Decode(&list)
+
+					if err != nil {
+						// print this like a regular object
+						fmt.Printf("%-10s  %-15s  %-15v\n", o.Spec.Metadata.Name, "-", o)
+						continue
+
+					}
+
+					for _, l := range list {
+
+						data := "-"
+						data, err = render.Render(l.Data)
+						if err != nil {
+							data = err.Error()
+						}
+
+						fmt.Printf("%-10s  %-15s  %-15v\n", l.Key, l.State, data)
+					}
 				}
 				return nil
+
 			})
 	}
 	return describe
