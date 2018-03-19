@@ -4,7 +4,6 @@ import (
 	"os/exec"
 	"strings"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/docker/infrakit/pkg/launch"
 )
 
@@ -15,15 +14,15 @@ func start(executor launch.Exec, name, sh string, setPgID bool) <-chan error {
 
 		defer close(block)
 
-		log.Infoln("OS(", executor.Name(), ") launcher: Plugin", name, "setPgId=", setPgID, "starting", sh)
+		log.Info("OS executor", "name", executor.Name(), "plugin", name, "setPgId", setPgID, "cmd", sh)
 		cmd := exec.Command("cmd", "/s", "/c", sh)
 
-		log.Infoln("Running", cmd.Path, strings.Join(cmd.Args, " "))
+		log.Info("Running", cmd.Path, strings.Join(cmd.Args, " "))
 
 		err := cmd.Start()
-		log.Infoln("Starting with", err, "sh=", sh)
+		log.Info("Starting with", "sh", sh, "err", err)
 		if err != nil {
-			log.Warningln("OS launcher: Plugin", name, "failed to start:", err, "cmd=", sh)
+			log.Warn("Err from OS executor", "plugin", name, "err", err, "cmd", sh)
 			block <- err
 		}
 	}()

@@ -1,0 +1,34 @@
+{{/* =% text %= */}}
+
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+
+kind: inventory
+metadata:
+  name: {{ $project }}
+options:
+  ObserveInterval: 5s
+  KeySelector: "\\{\\{.Tags.Name\\}\\}"
+properties:
+  networking:
+    - plugin: aws/ec2-vpc
+      labels:
+        infrakit_scope : {{ $project }}
+    - plugin: aws/ec2-internetgateway
+      labels:
+        infrakit_scope : {{ $project }}
+    - plugin: aws/ec2-routetable
+      labels:
+        infrakit_scope : {{ $project }}
+    - plugin: aws/ec2-subnet
+      labels:
+        infrakit_scope : {{ $project }}
+    - plugin: aws/ec2-securitygroup
+      labels:
+        infrakit_scope : {{ $project }}
+  compute:
+    - plugin: aws/ec2-instance
+      labels:
+        infrakit_scope : {{ $project }}
+    - plugin: aws/ec2-spot-instance
+      labels:
+        infrakit_scope : {{ $project }}

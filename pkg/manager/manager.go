@@ -513,7 +513,7 @@ func (m *manager) execPlugins(config globalSpec,
 
 		// TODO(chungers) ==> temporary
 		switch k.Kind {
-		case "ingress", "enrollment", "gc", "resource":
+		case "ingress", "enrollment", "gc", "resource", "inventory":
 
 			cp, err := m.scope.Controller(r.Handler.String())
 			if err != nil {
@@ -563,7 +563,7 @@ func (m *manager) execPlugins(config globalSpec,
 			log.Debug("queued operation for group", "key", k, "record", r, "V", debugV)
 
 		default:
-			log.Warn("not execing on for record", "record", r, "key", k)
+			log.Warn("not executing", "record", r, "key", k)
 			return nil
 		}
 

@@ -6,6 +6,6 @@ import (
 
 var (
 	log     = logutil.New("module", "core/fsm")
-	debugV  = logutil.V(300)
-	debugV2 = logutil.V(500)
+	debugV  = logutil.V(600)
+	debugV2 = logutil.V(1200)
 )

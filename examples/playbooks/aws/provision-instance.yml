@@ -1,22 +1,35 @@
 {{/* Input to create instance using the AWS instance plugin */}}
 {{/* =% instanceProvision `aws/ec2-instance` %= */}}
 
-{{ $user := flag "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
-{{ $project := flag "project" "string" "project" | prompt "Project?" "string" "myproject" }}
-{{ $imageId := flag "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
-{{ $instanceType := flag "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
-{{ $privateIp := flag "private-ip" "string" "Private IP" | prompt "Private IP address (IPv4)?" "string" "172.31.20.100" }}
+{{ $user := param "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+{{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
+{{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
 
+{{ $name := param "name" "string" "Host name" | prompt "Host name?" "string" (cat $project `-` (randAlphaNum 8) | nospace ) }}
 
-{{ $keyName := flag "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
-{{ $az := flag "az" "string" "availability zone" | prompt "Availability zone?" "string" "eu-central-1b"}}
-{{ $subnetId := flag "subnet" "string" "subnet id" | prompt "Subnet ID?" "string" "subnet-11b8376a" }}
-{{ $securityGroupId := flag "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" "sg-975500fe" }}
+{{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
+
+{{ $subnet := param "subnet" "string" "subnet" | prompt "Subnet?" "string" "subnet1" }}
+{{ $subnetKey := list `inventory` $project `networking/aws/ec2-subnet` (list $project $subnet | join `-`) `Properties` | join `/` }}
+
+{{ $azKey := list $subnetKey `AvailabilityZone` | join `/` }}
+{{ $az := metadata $azKey }}
+
+{{ $subnetIdKey := list $subnetKey `SubnetId` | join `/` }}
+{{ $subnetId := metadata $subnetIdKey }}
+
+{{ $cidrBlockKey := list $subnetKey `CidrBlock` | join `/` }}
+{{ $privateIp := param "private-ip" "string" "IP" | prompt "Private IP address?" "string" (metadata $cidrBlockKey) }}
+
+{{ $securityGroupIdKey := list `inventory` $project `networking/aws/ec2-securitygroup` (list $project `sg1` | join `-`) `Properties/GroupId` | join `/` }}
+
+{{ $securityGroupID := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" (metadata $securityGroupIdKey) }}
 
 Tags:
-  infrakit.scope: {{ $project }}
-  infrakit.created: {{ now | htmlDate }}
-  infrakit.user: {{ $user }}
+  infrakit_scope: {{ $project }}
+  infrakit_created: {{ now | htmlDate }}
+  infrakit_user: {{ $user }}
 
 Init: |
   #!/bin/bash
@@ -27,6 +40,9 @@ Init: |
   ln -s /usr/lib/go-1.9/bin/go /usr/local/bin/go
 
 Properties:
+  Tags:
+    Name: {{ $name }}
+    infrakit_user: {{ $user }}
   RunInstancesInput:
     BlockDeviceMappings: null
     DisableApiTermination: null
@@ -42,7 +58,7 @@ Properties:
       DeleteOnTermination: true
       DeviceIndex: 0
       Groups:
-      - {{ $securityGroupId }}
+      - {{ $securityGroupID }}
       NetworkInterfaceId: null
       SubnetId: {{ $subnetId }}
     Placement:
@@ -52,5 +68,3 @@ Properties:
     RamdiskId: null
     SubnetId: null
     UserData: null
-  Tags:
-    infrakit.user: {{ $user }}

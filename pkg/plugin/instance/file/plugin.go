@@ -6,12 +6,16 @@ import (
 	"path/filepath"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/spi"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/types"
 	"github.com/spf13/afero"
 	"math/rand"
+)
+
+var (
+	log = logutil.New("module", "launch/os")
 )
 
 // This example uses local files as a representation of an instance.  When we
@@ -41,7 +45,7 @@ type plugin struct {
 
 // NewPlugin returns an instance plugin backed by disk files.
 func NewPlugin(dir string) instance.Plugin {
-	log.Debugln("file instance plugin. dir=", dir)
+	log.Debug("file instance plugin", "dir", dir)
 	return &plugin{
 		Dir: dir,
 		fs:  afero.NewOsFs(),
@@ -74,14 +78,14 @@ func (p *plugin) ExampleProperties() *types.Any {
 
 // Validate performs local validation on a provision request.
 func (p *plugin) Validate(req *types.Any) error {
-	log.Debugln("validate", req.String())
+	log.Debug("validate", "req", req)
 
 	spec := Spec{}
 	if err := req.Decode(&spec); err != nil {
 		return err
 	}
 
-	log.Debugln("Validated:", spec)
+	log.Debug("Validated", "spec", spec)
 	return nil
 }
 
@@ -98,7 +102,7 @@ func (p *plugin) Provision(spec instance.Spec) (*instance.ID, error) {
 		},
 		Spec: spec,
 	}, "", "")
-	log.Debugln("provision", id, "data=", string(buff), "err=", err)
+	log.Debug("provision", "id", id, "data", string(buff), "err", err)
 	if err != nil {
 		return nil, err
 	}
@@ -126,7 +130,6 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 	}
 
 	buff, err = json.MarshalIndent(instanceData, "", "")
-	log.Debugln("label:", instance, "data=", string(buff), "err=", err)
 	if err != nil {
 		return err
 	}
@@ -136,14 +139,14 @@ func (p *plugin) Label(instance instance.ID, labels map[string]string) error {
 // Destroy terminates an existing instance.
 func (p *plugin) Destroy(instance instance.ID, context instance.Context) error {
 	fp := filepath.Join(p.Dir, string(instance))
-	log.Debugln("destroy", fp)
+	log.Debug("destroy", "path", fp)
 	return p.fs.Remove(fp)
 }
 
 // DescribeInstances returns descriptions of all instances matching all of the provided tags.
 // TODO - need to define the fitlering of tags => AND or OR of matches?
 func (p *plugin) DescribeInstances(tags map[string]string, properties bool) ([]instance.Description, error) {
-	log.Debugln("describe-instances", tags)
+	log.Debug("describe-instances", "tags", tags)
 	entries, err := afero.ReadDir(p.fs, p.Dir)
 	if err != nil {
 		return nil, err
@@ -155,14 +158,14 @@ scan:
 		fp := filepath.Join(p.Dir, entry.Name())
 		file, err := p.fs.Open(fp)
 		if err != nil {
-			log.Warningln("error opening", fp)
+			log.Warn("Error opening file", "path", fp)
 			continue scan
 		}
 
 		inst := fileInstance{}
 		err = json.NewDecoder(file).Decode(&inst)
 		if err != nil {
-			log.Warning("cannot decode", entry.Name())
+			log.Warn("Cannot decode", "file", entry.Name())
 			continue scan
 		}
 

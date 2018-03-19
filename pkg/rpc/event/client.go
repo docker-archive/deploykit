@@ -6,12 +6,16 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	broker "github.com/docker/infrakit/pkg/broker/client"
+	logutil "github.com/docker/infrakit/pkg/log"
 	"github.com/docker/infrakit/pkg/rpc"
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/types"
+)
+
+var (
+	log = logutil.New("module", "rpc/event")
 )
 
 // NewClient returns a plugin interface implementation connected to a remote plugin
@@ -51,7 +55,7 @@ func (c *client) SubscribeOn(topic types.Path) (<-chan *event.Event, chan<- stru
 	// check to see the address isn't a url
 	if strings.Contains(c.address, "://") {
 		url = c.address
-		log.Infoln("Connecting to network event stream:", url, "opts", opts)
+		log.Info("Connecting to network event stream", "url", url, "opts", opts)
 	}
 
 	topicStr := topic.String()
@@ -59,7 +63,7 @@ func (c *client) SubscribeOn(topic types.Path) (<-chan *event.Event, chan<- stru
 		topicStr = ""
 	}
 
-	log.Infoln("Connecting to broker url=", url, "topic=", topicStr, "opts=", opts)
+	log.Info("Connecting to server", "url", url, "topic", topicStr, "opts", opts)
 	raw, errors, done, err := broker.Subscribe(url, topicStr, opts)
 	if err != nil {
 		return nil, nil, err

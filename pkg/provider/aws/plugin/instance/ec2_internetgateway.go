@@ -105,7 +105,21 @@ func (p awsInternetGatewayPlugin) DescribeInstances(labels map[string]string, pr
 				tags[*tag.Key] = *tag.Value
 			}
 		}
-		descriptions = append(descriptions, instance.Description{ID: instance.ID(*internetGateway.InternetGatewayId), Tags: tags})
+
+		var state *types.Any
+		if properties {
+			if any, err := types.AnyValue(internetGateway); err == nil {
+				state = any
+			} else {
+				log.Warn("cannot encode ec2InternetGateway", "err", err, "igw", internetGateway)
+			}
+		}
+
+		descriptions = append(descriptions,
+			instance.Description{
+				ID:         instance.ID(*internetGateway.InternetGatewayId),
+				Tags:       tags,
+				Properties: state})
 	}
 	return descriptions, nil
 }

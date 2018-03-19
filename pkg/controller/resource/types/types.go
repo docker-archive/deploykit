@@ -66,6 +66,8 @@ func (p Properties) Validate(ctx context.Context) error {
 
 // Options is the controller options that is used at start up of the process.  It's one-time
 type Options struct {
+	// for overriding globally
+	*internal.InstanceObserver `json:",inline" yaml:",inline"`
 
 	// PluginRetryInterval is the interval for retrying to connect to the plugins
 	PluginRetryInterval types.Duration

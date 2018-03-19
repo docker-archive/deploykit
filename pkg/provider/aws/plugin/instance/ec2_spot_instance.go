@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -283,7 +282,7 @@ func (p awsSpotInstancePlugin) Provision(spec instance.Spec) (*instance.ID, erro
 	}
 
 	if len(awsVolumeIDs) > 0 {
-		log.Infof("Waiting for request %s to enter fulfilled and instance to enter running state before attaching volume", *id)
+		log.Info("Waiting for instance to enter running state before attaching volume", "instance", *id)
 		err = p.client.WaitUntilSpotInstanceRequestFulfilled(&ec2.DescribeSpotInstanceRequestsInput{
 			SpotInstanceRequestIds: []*string{
 				spotRequest.SpotInstanceRequestId,
@@ -396,7 +395,7 @@ func (p awsSpotInstancePlugin) describeGroupRequest(namespaceTags, tags map[stri
 	}
 	return &ec2.DescribeSpotInstanceRequestsInput{Filters: filters}
 }
-func (p awsSpotInstancePlugin) getLogicalID(id *string) (*string, error) {
+func (p awsSpotInstancePlugin) getEC2Instance(id *string) (*ec2.Instance, error) {
 	input := &ec2.DescribeInstancesInput{
 		InstanceIds: []*string{
 			id,
@@ -408,7 +407,8 @@ func (p awsSpotInstancePlugin) getLogicalID(id *string) (*string, error) {
 	}
 	for _, request := range result.Reservations {
 		for _, ec2Instance := range request.Instances {
-			return ec2Instance.PrivateIpAddress, nil
+			copy := *ec2Instance
+			return &copy, nil
 		}
 	}
 	return nil, nil
@@ -430,26 +430,41 @@ func (p awsSpotInstancePlugin) describeRequests(tags map[string]string, properti
 			}
 		}
 		var lID *string
+		var ec2Instance *ec2.Instance
+
 		if request.InstanceId != nil {
-			lID, err = p.getLogicalID(request.InstanceId)
+			ec2Instance, err = p.getEC2Instance(request.InstanceId)
 			if err != nil {
 				return nil, err
 			}
-		}
-
-		var status *types.Any
-		if properties {
-			if v, err := types.AnyValue(request); err == nil {
-				status = v
-			} else {
-				log.Warningln("cannot encode ec2Instance:", err)
+			if ec2Instance != nil {
+				lID = ec2Instance.PrivateIpAddress
 			}
 		}
+
+		var state *types.Any
+		if properties {
+
+			type desc struct {
+				Request  *ec2.SpotInstanceRequest
+				Instance *ec2.Instance
+			}
+
+			if v, err := types.AnyValue(desc{
+				Request:  request,
+				Instance: ec2Instance,
+			}); err == nil {
+				state = v
+			} else {
+				log.Warn("cannot encode ec2Instance", "err", err)
+			}
+		}
+
 		descriptions = append(descriptions, instance.Description{
 			ID:         instance.ID(*request.SpotInstanceRequestId),
 			LogicalID:  (*instance.LogicalID)(lID),
 			Tags:       tags,
-			Properties: status,
+			Properties: state,
 		})
 	}
 	return descriptions, nil

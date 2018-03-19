@@ -116,6 +116,15 @@ func BuildModel(properties inventory.Properties, options inventory.Options) (*Mo
 		}
 	}
 
+	// We must guarantee that the tick size is at least as large as the global
+	// setting.  This is so that we don't miss samples and instead advances state
+	// too quickly.
+	if options.InstanceObserver.ObserveInterval.Duration() > model.tickSize {
+		model.tickSize = options.InstanceObserver.ObserveInterval.Duration()
+	}
+
+	log.Info("model", "tickSize", model.tickSize)
+
 	model.clock = fsm.Wall(time.Tick(model.tickSize))
 	spec, err := fsm.With(stateNames, signalNames).Define(
 		fsm.State{

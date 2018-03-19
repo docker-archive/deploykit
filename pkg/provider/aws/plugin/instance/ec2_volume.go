@@ -80,7 +80,22 @@ func (p awsVolumePlugin) DescribeInstances(labels map[string]string, properties 
 				tags[*tag.Key] = *tag.Value
 			}
 		}
-		descriptions = append(descriptions, instance.Description{ID: instance.ID(*volume.VolumeId), Tags: tags})
+
+		var state *types.Any
+		if properties {
+			if any, err := types.AnyValue(volume); err == nil {
+				state = any
+			} else {
+				log.Warn("cannot encode ec2Volume", "err", err, "volume", volume)
+			}
+		}
+
+		descriptions = append(descriptions,
+			instance.Description{
+				ID:         instance.ID(*volume.VolumeId),
+				Tags:       tags,
+				Properties: state,
+			})
 	}
 	return descriptions, nil
 }
