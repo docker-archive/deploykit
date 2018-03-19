@@ -23,7 +23,7 @@ var (
 	// DefaultOptions return an Options with default values filled in.
 	DefaultOptions = inventory.Options{
 		InstanceObserver: &internal.InstanceObserver{
-			ObserveInterval: types.Duration(1 * time.Second),
+			ObserveInterval: types.Duration(5 * time.Second),
 			KeySelector: template.EscapeString(fmt.Sprintf(`{{.Tags.%s}}/{{.Tags.%s}}`,
 				internal.CollectionLabel, internal.InstanceLabel)),
 		},

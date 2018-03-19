@@ -24,28 +24,27 @@ var (
 	// DefaultOptions is the default options of the controller. This can be controlled at starup
 	// and is set once.
 	DefaultOptions = resource.Options{
+		InstanceObserver: &internal.InstanceObserver{
+			ObserveInterval: types.Duration(5 * time.Second),
+			KeySelector: template.EscapeString(fmt.Sprintf(`{{.Tags.%s}}`,
+				internal.InstanceLabel)),
+		},
 		PluginRetryInterval:    types.Duration(1 * time.Second),
 		MinChannelBufferSize:   10,
-		MinWaitBeforeProvision: 1,
+		MinWaitBeforeProvision: 5,
 		ModelProperties:        DefaultModelProperties,
 	}
 
 	// DefaultModelProperties is the default properties for the fsm model
 	DefaultModelProperties = resource.ModelProperties{
 		TickUnit:            types.FromDuration(1 * time.Second),
-		WaitBeforeProvision: fsm.Tick(2),
-		WaitBeforeDestroy:   fsm.Tick(2),
+		WaitBeforeProvision: fsm.Tick(5),
+		WaitBeforeDestroy:   fsm.Tick(5),
 		ChannelBufferSize:   10,
 	}
 
 	// DefaultProperties is the default properties for the controller, this is per collection / commit
 	DefaultProperties = resource.Properties{}
-
-	// DefaultAccessProperties specifies some default parameters
-	DefaultAccessProperties = &internal.InstanceObserver{
-		ObserveInterval: types.Duration(1 * time.Second),
-		KeySelector:     template.EscapeString(fmt.Sprintf(`{{.Tags.%s}}`, internal.InstanceLabel)),
-	}
 )
 
 // Components contains a set of components in this controller.

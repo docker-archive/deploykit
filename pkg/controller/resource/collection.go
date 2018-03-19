@@ -586,7 +586,7 @@ func (c *collection) configureAccessor(spec types.Spec, name string, access *int
 	access.Labels[internal.CollectionLabel] = spec.Metadata.Name
 	access.Labels[internal.InstanceLabel] = name
 
-	err := access.InstanceObserver.Validate(DefaultAccessProperties)
+	err := access.InstanceObserver.Validate(c.options.InstanceObserver)
 	if err != nil {
 		return err
 	}
