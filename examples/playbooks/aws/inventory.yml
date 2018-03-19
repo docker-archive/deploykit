@@ -12,23 +12,23 @@ properties:
   networking:
     - plugin: aws/ec2-vpc
       labels:
-        infrakit.scope : {{ $project }}
+        infrakit_scope : {{ $project }}
     - plugin: aws/ec2-internetgateway
       labels:
-        infrakit.scope : {{ $project }}
+        infrakit_scope : {{ $project }}
     - plugin: aws/ec2-routetable
       labels:
-        infrakit.scope : {{ $project }}
+        infrakit_scope : {{ $project }}
     - plugin: aws/ec2-subnet
       labels:
-        infrakit.scope : {{ $project }}
+        infrakit_scope : {{ $project }}
     - plugin: aws/ec2-securitygroup
       labels:
-        infrakit.scope : {{ $project }}
+        infrakit_scope : {{ $project }}
   compute:
     - plugin: aws/ec2-instance
       labels:
-        infrakit.scope : {{ $project }}
+        infrakit_scope : {{ $project }}
     - plugin: aws/ec2-spot-instance
       labels:
-        infrakit.scope : {{ $project }}
+        infrakit_scope : {{ $project }}

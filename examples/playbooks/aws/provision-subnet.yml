@@ -12,9 +12,9 @@
 
 
 Tags:
-  infrakit.scope: {{ $project }}
-  infrakit.created: {{ now | htmlDate }}
-  infrakit.user: {{ $user }}
+  infrakit_scope: {{ $project }}
+  infrakit_created: {{ now | htmlDate }}
+  infrakit_user: {{ $user }}
 
 Properties:
   CreateSubnetInput:
@@ -25,4 +25,4 @@ Properties:
     RouteTableId: {{ $routeTableID }}
   Tags:
     Name: {{ $project }}-{{ $name }}
-    infrakit.user: {{ $user }}
+    infrakit_user: {{ $user }}

@@ -7,14 +7,14 @@
 {{ $cidr := param "cidr" "string" "CIDR Block" | prompt "CIDR block?" "string" "10.0.0.0/16" }}
 
 Tags:
-  infrakit.scope: {{ $project }}
-  infrakit.created: {{ now | htmlDate }}
-  infrakit.user: {{ $user }}
+  infrakit_scope: {{ $project }}
+  infrakit_created: {{ now | htmlDate }}
+  infrakit_user: {{ $user }}
 
 Properties:
   Tags:
     Name: {{ $project }}-vpc
-    infrakit.user: {{ $user }}
+    infrakit_user: {{ $user }}
   CreateVpcInput:
     CidrBlock: {{ $cidr }}
   ModifyVpcAttributeInputs:

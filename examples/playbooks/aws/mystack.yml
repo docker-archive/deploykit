@@ -14,7 +14,7 @@ kind: resource
 metadata:
   name: {{ $project }}
 options:
-  ObserveInterval: 5s
+  ObserveInterval: 30s
 properties:
 
   # The VPC
@@ -22,9 +22,9 @@ properties:
     plugin: aws/ec2-vpc
     labels:
       Name: {{ $project }}-vpc
-      infrakit.scope: {{ $project }}
-      infrakit.created: {{ now | htmlDate }}
-      infrakit.user: {{ $user }}
+      infrakit_scope: {{ $project }}
+      infrakit_created: {{ now | htmlDate }}
+      infrakit_user: {{ $user }}
     Properties:
       CreateVpcInput:
         CidrBlock: {{ $cidr }}
@@ -39,9 +39,9 @@ properties:
     plugin: aws/ec2-internetgateway
     labels:
       Name: {{ $project }}-igw
-      infrakit.scope: {{ $project }}
-      infrakit.created: {{ now | htmlDate }}
-      infrakit.user: {{ $user }}
+      infrakit_scope: {{ $project }}
+      infrakit_created: {{ now | htmlDate }}
+      infrakit_user: {{ $user }}
     Properties:
       AttachInternetGatewayInput:
         VpcId : {{ depend `vpc/Properties/VpcId` }}
@@ -51,9 +51,9 @@ properties:
     plugin: aws/ec2-routetable
     labels:
       Name: {{ $project }}-rtb
-      infrakit.scope: {{ $project }}
-      infrakit.created: {{ now | htmlDate }}
-      infrakit.user: {{ $user }}
+      infrakit_scope: {{ $project }}
+      infrakit_created: {{ now | htmlDate }}
+      infrakit_user: {{ $user }}
     Properties:
       CreateRouteTableInput:
         VpcId : {{ depend `vpc/Properties/VpcId` }}
@@ -66,9 +66,9 @@ properties:
     plugin: aws/ec2-subnet
     labels:
       Name: {{ $project }}-subnet1
-      infrakit.scope: {{ $project }}
-      infrakit.created: {{ now | htmlDate }}
-      infrakit.user: {{ $user }}
+      infrakit_scope: {{ $project }}
+      infrakit_created: {{ now | htmlDate }}
+      infrakit_user: {{ $user }}
     Properties:
       CreateSubnetInput:
         VpcId : {{ depend `vpc/Properties/VpcId` }}
@@ -82,9 +82,9 @@ properties:
     plugin: aws/ec2-subnet
     labels:
       Name: {{ $project }}-subnet2
-      infrakit.scope: {{ $project }}
-      infrakit.created: {{ now | htmlDate }}
-      infrakit.user: {{ $user }}
+      infrakit_scope: {{ $project }}
+      infrakit_created: {{ now | htmlDate }}
+      infrakit_user: {{ $user }}
     Properties:
       CreateSubnetInput:
         VpcId : {{ depend `vpc/Properties/VpcId` }}
@@ -98,9 +98,9 @@ properties:
     plugin: aws/ec2-securitygroup
     labels:
       Name: {{ $project }}-sg1
-      infrakit.scope: {{ $project }}
-      infrakit.created: {{ now | htmlDate }}
-      infrakit.user: {{ $user }}
+      infrakit_scope: {{ $project }}
+      infrakit_created: {{ now | htmlDate }}
+      infrakit_user: {{ $user }}
     Properties:
       CreateSecurityGroupInput:
         VpcId : {{ depend `vpc/Properties/VpcId` }}

@@ -8,14 +8,14 @@
 {{ $name := param "name" "string" "SG name" | prompt "SecurityGroup name?" "string" "sg-1" }}
 
 Tags:
-  infrakit.scope: {{ $project }}
-  infrakit.created: {{ now | htmlDate }}
-  infrakit.user: {{ $user }}
+  infrakit_scope: {{ $project }}
+  infrakit_created: {{ now | htmlDate }}
+  infrakit_user: {{ $user }}
 
 Properties:
   Tags:
     Name: {{ $project }}-{{ $name }}
-    infrakit.user: {{ $user }}
+    infrakit_user: {{ $user }}
   CreateSecurityGroupInput:
     VpcId : {{ $vpcID }}
     GroupName: {{ $name }}

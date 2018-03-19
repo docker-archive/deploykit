@@ -7,13 +7,13 @@
 {{ $vpcID := param "vpcID" "string" "VPC ID" | prompt "VPC ID?" "string" }}
 
 Tags:
-  infrakit.scope: {{ $project }}
-  infrakit.created: {{ now | htmlDate }}
-  infrakit.user: {{ $user }}
+  infrakit_scope: {{ $project }}
+  infrakit_created: {{ now | htmlDate }}
+  infrakit_user: {{ $user }}
 
 Properties:
   Tags:
     Name: {{ $project }}-igw
-    infrakit.user: {{ $user }}
+    infrakit_user: {{ $user }}
   AttachInternetGatewayInput:
     VpcId : {{ $vpcID }}

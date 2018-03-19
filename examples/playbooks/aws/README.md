@@ -90,9 +90,9 @@ properties:
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
     labels:
       Name: myproject-igw
-      infrakit.created: 2018-03-18
-      infrakit.scope: myproject
-      infrakit.user: davidchung
+      infrakit_created: 2018-03-18
+      infrakit_scope: myproject
+      infrakit_user: davidchung
     plugin: aws/ec2-internetgateway
   rtb:
     Properties:
@@ -103,9 +103,9 @@ properties:
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
     labels:
       Name: myproject-rtb
-      infrakit.created: 2018-03-18
-      infrakit.scope: myproject
-      infrakit.user: davidchung
+      infrakit_created: 2018-03-18
+      infrakit_scope: myproject
+      infrakit_user: davidchung
     plugin: aws/ec2-routetable
   sg1:
     Properties:
@@ -124,9 +124,9 @@ properties:
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
     labels:
       Name: myproject-sg1
-      infrakit.created: 2018-03-18
-      infrakit.scope: myproject
-      infrakit.user: davidchung
+      infrakit_created: 2018-03-18
+      infrakit_scope: myproject
+      infrakit_user: davidchung
     plugin: aws/ec2-securitygroup
   subnet1:
     Properties:
@@ -138,9 +138,9 @@ properties:
         RouteTableId: '@depend(''rtb/Properties/RouteTableId'')@'
     labels:
       Name: myproject-subnet1
-      infrakit.created: 2018-03-18
-      infrakit.scope: myproject
-      infrakit.user: davidchung
+      infrakit_created: 2018-03-18
+      infrakit_scope: myproject
+      infrakit_user: davidchung
     plugin: aws/ec2-subnet
   subnet2:
     Properties:
@@ -152,9 +152,9 @@ properties:
         RouteTableId: '@depend(''rtb/Properties/RouteTableId'')@'
     labels:
       Name: myproject-subnet2
-      infrakit.created: 2018-03-18
-      infrakit.scope: myproject
-      infrakit.user: davidchung
+      infrakit_created: 2018-03-18
+      infrakit_scope: myproject
+      infrakit_user: davidchung
     plugin: aws/ec2-subnet
   vpc:
     Properties:
@@ -167,9 +167,9 @@ properties:
           Value: true
     labels:
       Name: myproject-vpc
-      infrakit.created: 2018-03-18
-      infrakit.scope: myproject
-      infrakit.user: davidchung
+      infrakit_created: 2018-03-18
+      infrakit_scope: myproject
+      infrakit_user: davidchung
     plugin: aws/ec2-vpc
 state:
 - Key: igw
@@ -257,10 +257,10 @@ networking/aws/ec2-internetgateway/myproject-igw/Properties/Tags/[8]/Value
 networking/aws/ec2-internetgateway/myproject-igw/Properties/Tags/[9]/Key
 networking/aws/ec2-internetgateway/myproject-igw/Properties/Tags/[9]/Value
 networking/aws/ec2-internetgateway/myproject-igw/Tags/Name
-networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit.created
-networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit.namespace
-networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit.scope
-networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit.user
+networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit_created
+networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit_namespace
+networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit_scope
+networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit_user
 networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit_collection
 networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit_instance
 networking/aws/ec2-internetgateway/myproject-igw/Tags/infrakit_link
@@ -324,10 +324,10 @@ networking/aws/ec2-routetable/myproject-rtb/Properties/Tags/[9]/Key
 networking/aws/ec2-routetable/myproject-rtb/Properties/Tags/[9]/Value
 networking/aws/ec2-routetable/myproject-rtb/Properties/VpcId
 networking/aws/ec2-routetable/myproject-rtb/Tags/Name
-networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit.created
-networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit.namespace
-networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit.scope
-networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit.user
+networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit_created
+networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit_namespace
+networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit_scope
+networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit_user
 networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit_collection
 networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit_instance
 networking/aws/ec2-routetable/myproject-rtb/Tags/infrakit_link
@@ -382,10 +382,10 @@ networking/aws/ec2-securitygroup/myproject-sg1/Properties/Tags/[9]/Key
 networking/aws/ec2-securitygroup/myproject-sg1/Properties/Tags/[9]/Value
 networking/aws/ec2-securitygroup/myproject-sg1/Properties/VpcId
 networking/aws/ec2-securitygroup/myproject-sg1/Tags/Name
-networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit.created
-networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit.namespace
-networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit.scope
-networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit.user
+networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit_created
+networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit_namespace
+networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit_scope
+networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit_user
 networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit_collection
 networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit_instance
 networking/aws/ec2-securitygroup/myproject-sg1/Tags/infrakit_link
@@ -426,10 +426,10 @@ networking/aws/ec2-subnet/myproject-subnet1/Properties/Tags/[9]/Key
 networking/aws/ec2-subnet/myproject-subnet1/Properties/Tags/[9]/Value
 networking/aws/ec2-subnet/myproject-subnet1/Properties/VpcId
 networking/aws/ec2-subnet/myproject-subnet1/Tags/Name
-networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit.created
-networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit.namespace
-networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit.scope
-networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit.user
+networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit_created
+networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit_namespace
+networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit_scope
+networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit_user
 networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit_collection
 networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit_instance
 networking/aws/ec2-subnet/myproject-subnet1/Tags/infrakit_link
@@ -471,10 +471,10 @@ networking/aws/ec2-subnet/myproject-subnet2/Properties/Tags/[9]/Key
 networking/aws/ec2-subnet/myproject-subnet2/Properties/Tags/[9]/Value
 networking/aws/ec2-subnet/myproject-subnet2/Properties/VpcId
 networking/aws/ec2-subnet/myproject-subnet2/Tags/Name
-networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit.created
-networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit.namespace
-networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit.scope
-networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit.user
+networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit_created
+networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit_namespace
+networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit_scope
+networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit_user
 networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit_collection
 networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit_instance
 networking/aws/ec2-subnet/myproject-subnet2/Tags/infrakit_link
@@ -511,10 +511,10 @@ networking/aws/ec2-vpc/myproject-vpc/Properties/Tags/[9]/Key
 networking/aws/ec2-vpc/myproject-vpc/Properties/Tags/[9]/Value
 networking/aws/ec2-vpc/myproject-vpc/Properties/VpcId
 networking/aws/ec2-vpc/myproject-vpc/Tags/Name
-networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit.created
-networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit.namespace
-networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit.scope
-networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit.user
+networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_created
+networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_namespace
+networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_scope
+networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_user
 networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_collection
 networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_instance
 networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_link
@@ -548,7 +548,7 @@ instance.  In this case, you can see if it's created:
 ```
 $ infrakit local aws/ec2-spot-instance describe
 ID                            	LOGICAL                       	TAGS
-sir-m81rhchp                  	10.0.200.100                  	Name=myproject-Zm6UfgDt,infrakit.created=2018-03-18,infrakit.namespace=davidchung,infrakit.scope=myproject,infrakit.user=davidchung
+sir-m81rhchp                  	10.0.200.100                  	Name=myproject-Zm6UfgDt,infrakit_created=2018-03-18,infrakit_namespace=davidchung,infrakit_scope=myproject,infrakit_user=davidchung
 ```
 
 or via the inventory controller.   We query for entries under the `compute` category

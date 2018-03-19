@@ -8,14 +8,14 @@
 {{ $gatewayID := param "gatewayID" "string" "Gateway ID" | prompt "Gateway ID?" "string" }}
 
 Tags:
-  infrakit.scope: {{ $project }}
-  infrakit.created: {{ now | htmlDate }}
-  infrakit.user: {{ $user }}
+  infrakit_scope: {{ $project }}
+  infrakit_created: {{ now | htmlDate }}
+  infrakit_user: {{ $user }}
 
 Properties:
   Tags:
     Name: {{ $project }}-public-route-via-gateway
-    infrakit.user: {{ $user }}
+    infrakit_user: {{ $user }}
   CreateRouteTableInput:
     VpcId : {{ $vpcID }}
   CreateRouteInputs:

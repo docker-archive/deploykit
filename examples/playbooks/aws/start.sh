@@ -31,10 +31,10 @@ fi
 AWS_ACCESS_KEY_ID={{ $creds.aws_access_key_id }} \
 AWS_SECRET_ACCESS_KEY={{ $creds.aws_secret_access_key }} \
 INFRAKIT_AWS_REGION={{ $region }} \
-INFRAKIT_AWS_NAMESPACE_TAGS="infrakit.namespace={{ $namespace }}" \
+INFRAKIT_AWS_NAMESPACE_TAGS="infrakit_namespace={{ $namespace }}" \
 INFRAKIT_MANAGER_CONTROLLERS=resource,inventory \
 infrakit plugin start manager:mystack vars group resource inventory aws \
 	 --log 5 --log-stack --log-debug-V 1000 \
-	 --log-debug-match module=controller/inventory \
 	 --log-debug-match module=controller/resource \
 	 --log-debug-match module=provider/aws \
+	 --log-debug-match module=core/fsm \

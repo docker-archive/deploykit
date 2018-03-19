@@ -29,9 +29,9 @@
 {{ $securityGroupID := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" (metadata $securityGroupIdKey) }}
 
 Tags:
-  infrakit.scope: {{ $project }}
-  infrakit.created: {{ now | htmlDate }}
-  infrakit.user: {{ $user }}
+  infrakit_scope: {{ $project }}
+  infrakit_created: {{ now | htmlDate }}
+  infrakit_user: {{ $user }}
 
 Init: |
   #!/bin/bash
@@ -44,7 +44,7 @@ Init: |
 Properties:
   Tags:
     Name: {{ $name }}
-    infrakit.user: {{ $user }}
+    infrakit_user: {{ $user }}
   RequestSpotInstancesInput:
     LaunchSpecification:
       ImageId: {{ $imageId }}
