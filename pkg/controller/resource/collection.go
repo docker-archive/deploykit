@@ -578,13 +578,13 @@ func (c *collection) stop() error {
 }
 
 func (c *collection) configureAccessor(spec types.Spec, name string, access *internal.InstanceAccess) error {
-	if access.Labels == nil {
-		access.Labels = map[string]string{}
+	if access.Select == nil {
+		access.Select = map[string]string{}
 	}
 
 	// inject a filter specifically for *this* resource
-	access.Labels[internal.CollectionLabel] = spec.Metadata.Name
-	access.Labels[internal.InstanceLabel] = name
+	access.Select[internal.CollectionLabel] = spec.Metadata.Name
+	access.Select[internal.InstanceLabel] = name
 
 	err := access.InstanceObserver.Validate(c.options.InstanceObserver)
 	if err != nil {
@@ -668,7 +668,7 @@ func (c *collection) populateDependencies(resourceName string, spec instance.Spe
 	// Additional labels in the InstanceAccess spec
 	access := c.accessors[resourceName]
 	if access != nil {
-		for k, v := range access.Labels {
+		for k, v := range access.Select {
 			processed.Tags[k] = v
 		}
 	}

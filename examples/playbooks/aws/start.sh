@@ -8,7 +8,7 @@
 {{ if $clearState }}
 echo "Clear local state from previous runs"
 rm -rf ~/.infrakit/plugins/* # remove sockets, pid files, etc.
-rm -rf ~/.infrakit/configs/global.config # for file based manager
+rm -rf ~/.infrakit/configs/* # for file based manager
 # Since we are using file based leader detection, write the default name (manager1) to the leader file.
 echo manager1 > ~/.infrakit/leader
 {{ end }}

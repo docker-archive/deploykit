@@ -33,7 +33,7 @@ type remote struct {
 	modules Modules
 	input   io.Reader
 	scope   scope.Scope
-	options template.Options
+	options Options
 }
 
 // Op is the name of the operation / sub-command
@@ -45,9 +45,18 @@ type SourceURL string
 // Modules is a mapping of operations and the source url that defines it
 type Modules map[Op]SourceURL
 
+// Options contains tuning params for the behavior of the templating engine and callables.
+type Options struct {
+
+	// ShowAllWarnings will print all warnings to the console.
+	ShowAllWarnings bool
+
+	template.Options `json:",inline" yaml:",inline"`
+}
+
 // NewModules returns an implementation of Modules using a file at given URL. The file is in YAML format
 func NewModules(scope scope.Scope, modules Modules, input io.Reader,
-	options template.Options) (cli.Modules, error) {
+	options Options) (cli.Modules, error) {
 
 	return &remote{
 		modules: modules,
@@ -79,8 +88,8 @@ func Encode(m Modules) ([]byte, error) {
 	return yaml.JSONToYAML(any.Bytes())
 }
 
-func dir(url SourceURL, options template.Options) (Modules, error) {
-	t, err := template.NewTemplate(string(url), options)
+func dir(url SourceURL, options Options) (Modules, error) {
+	t, err := template.NewTemplate(string(url), options.Options)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +109,7 @@ func dir(url SourceURL, options template.Options) (Modules, error) {
 }
 
 func list(context context.Context, scope scope.Scope, modules Modules, input io.Reader,
-	parent *cobra.Command, parentURL *SourceURL, options template.Options) ([]*cobra.Command, error) {
+	parent *cobra.Command, parentURL *SourceURL, options Options) ([]*cobra.Command, error) {
 
 	found := []*cobra.Command{}
 
@@ -137,7 +146,7 @@ loop:
 			readmeURL.Path = path.Join(path.Dir(parent.Path), "README.md")
 			readmeURLStr = readmeURL.String()
 		}
-		if t, err := template.NewTemplate(readmeURLStr, options); err == nil {
+		if t, err := template.NewTemplate(readmeURLStr, options.Options); err == nil {
 			if view, err := t.Render(nil); err == nil {
 				cmd.SetHelpTemplate(fmt.Sprintf(helpTemplate, view))
 			}
@@ -162,7 +171,9 @@ loop:
 			callable := callable.NewCallable(scope, string(moduleURL),
 				callable.ParametersFromFlags(cmd.Flags()),
 				callable.Options{
-					Prompter: callable.PrompterFromReader(input),
+					ShowAllWarnings: options.ShowAllWarnings,
+					TemplateOptions: options.Options,
+					Prompter:        callable.PrompterFromReader(input),
 				})
 			err := callable.DefineParameters()
 			if err != nil {

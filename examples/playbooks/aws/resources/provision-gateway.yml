@@ -1,19 +1,15 @@
 {{/* Input to create instance using the AWS instance plugin */}}
 {{/* =% instanceProvision `aws/ec2-internetgateway` %= */}}
 
-{{ $user := param "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
 {{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
 
 {{ $vpcID := param "vpcID" "string" "VPC ID" | prompt "VPC ID?" "string" }}
 
 Tags:
   infrakit_scope: {{ $project }}
-  infrakit_created: {{ now | htmlDate }}
-  infrakit_user: {{ $user }}
 
 Properties:
   Tags:
     Name: {{ $project }}-igw
-    infrakit_user: {{ $user }}
   AttachInternetGatewayInput:
     VpcId : {{ $vpcID }}

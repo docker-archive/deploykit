@@ -106,13 +106,47 @@ func metadataPlugin(plugins func() discovery.Plugins, mpath types.Path) (*Metada
 	return &MetadataCall{Name: pluginName, Key: key, Plugin: pl}, nil
 }
 
+func clean(args ...interface{}) []interface{} {
+	// HACK - for some reason, with playbooks that
+	// are evaluated twice, an expression like this
+	//
+	// {{ $project := metadata `vars/project` }}
+	// will appear with an optional args of [ "" ].
+	// This causes problems in that it looks like setting
+	// the vallue to empty string.
+	// So this function needs to catch that case and sanitize
+	// the input to the metadata function.
+
+	if len(args) > 1 {
+		return args
+	}
+
+	out := []interface{}{}
+	for i, a := range args {
+		switch a := a.(type) {
+		case string:
+			if a == "" && i == 0 {
+				continue
+			}
+		case *string:
+			if a != nil && *a == "" && i == 0 {
+				continue
+			}
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
 // MetadataFunc returns a template function to support metadata retrieval in templates.
 // The function allows an additional parameter to set the value, provided the metadata plugin
 // is not readonly (supports the metadata.Updatable spi).  In the case of an update, the returned value
 // is always an empty string, with error (can be nil).  The behavior is the same as var function.
 func MetadataFunc(scope Scope) func(string, ...interface{}) (interface{}, error) {
 
-	return func(path string, optionalValue ...interface{}) (interface{}, error) {
+	return func(path string, args ...interface{}) (interface{}, error) {
+
+		optionalValue := clean(args...)
 
 		switch len(optionalValue) {
 		case 0: // read

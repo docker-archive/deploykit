@@ -201,7 +201,13 @@ func useCommand(scope scope.Scope, use, description string, pb *playbook.Playboo
 
 			// Commands from playbooks
 			playbookCommands := []*cobra.Command{}
-			if playbooks, err := playbook.NewModules(scope, pb.Modules(), os.Stdin, template.Options{}); err != nil {
+			if playbooks, err := playbook.NewModules(scope, pb.Modules(),
+				os.Stdin,
+				playbook.Options{
+					// This value here is set by the environment variables
+					// because its evaluation is needed prior to flags generation.
+					ShowAllWarnings: local.Getenv("INFRAKIT_CALLABLE_WARNINGS", "false") == "true",
+				}); err != nil {
 				log.Warn("error loading playbooks", "err", err)
 			} else {
 				if more, err := playbooks.List(); err != nil {

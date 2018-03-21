@@ -7,15 +7,15 @@ options:
 properties:
   disks:
     - plugin: az1/disk
-      labels:
+      select:
         infrakit_collection: az1-resources
     - plugin: az2/disk
-      labels:
+      select:
         infrakit_collection: az2-resources
   network:
     - plugin: az1/net
-      labels:
+      select:
         infrakit_collection: az1-resources
     - plugin: az2/net
-      labels:
+      select:
         infrakit_collection: az2-resources

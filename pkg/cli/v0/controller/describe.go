@@ -43,17 +43,17 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 			q = &s
 		}
 
-		objects, err := controller.Describe(q)
+		collections, err := controller.Describe(q)
 		if err != nil {
 			return err
 		}
 
-		return services.Output(os.Stdout, objects,
+		return services.Output(os.Stdout, collections,
 			func(w io.Writer, v interface{}) error {
 
 				if !*objectsOnly {
 					fmt.Printf("%-10s  %-15s  %-15s\n", "KIND", "NAME", "ID")
-					for _, o := range objects {
+					for _, o := range collections {
 
 						id := "-"
 						if o.Spec.Metadata.Identity != nil {
@@ -70,12 +70,18 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 					return err
 				}
 
-				// show objects only from spec.State
-				fmt.Printf("%-10s  %-15s  %-15s\n", "KEY", "STATE", "DATA")
-				for _, o := range objects {
+				// show collections only from spec.State
+				format := "%-20s  %-15s  %-15s  %-15s\n"
+				rows := map[string]string{}
+				keys := types.Paths{}
 
-					if o.State == nil {
-						fmt.Printf("%-10s  %-15s  %-15s\n", o.Spec.Metadata.Name, "-", "-")
+				// collect all the fsm from each collection
+				for i, c := range collections {
+
+					if c.State == nil {
+						key := types.PathFrom(c.Spec.Metadata.Name, fmt.Sprintf("%v", i))
+						keys = append(keys, key)
+						rows[key.String()] = fmt.Sprintf(format, c.Spec.Metadata.Name, "-", "-", "-")
 						continue
 					}
 
@@ -87,11 +93,13 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 					}
 
 					list := []fsm{}
-					err := o.State.Decode(&list)
+					err := c.State.Decode(&list)
 
 					if err != nil {
-						// print this like a regular object
-						fmt.Printf("%-10s  %-15s  %-15v\n", o.Spec.Metadata.Name, "-", o)
+						// print error instead of data
+						key := types.PathFrom(c.Spec.Metadata.Name, fmt.Sprintf("%v", i))
+						keys = append(keys, key)
+						rows[key.String()] = fmt.Sprintf(format, c.Spec.Metadata.Name, "-", "-", err.Error())
 						continue
 
 					}
@@ -104,9 +112,18 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 							data = err.Error()
 						}
 
-						fmt.Printf("%-10s  %-15s  %-15v\n", l.Key, l.State, data)
+						key := types.PathFrom(c.Spec.Metadata.Name, l.Key)
+						keys = append(keys, key)
+						rows[key.String()] = fmt.Sprintf(format, c.Spec.Metadata.Name, l.Key, l.State, data)
 					}
 				}
+
+				keys.Sort()
+				fmt.Printf(format, "COLLECTION", "KEY", "STATE", "DATA")
+				for _, k := range keys {
+					fmt.Print(rows[k.String()])
+				}
+
 				return nil
 
 			})

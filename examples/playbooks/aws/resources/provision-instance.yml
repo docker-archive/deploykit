@@ -1,35 +1,18 @@
 {{/* Input to create instance using the AWS instance plugin */}}
 {{/* =% instanceProvision `aws/ec2-instance` %= */}}
 
-{{ $user := param "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
 {{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
 {{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
 {{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
-
 {{ $name := param "name" "string" "Host name" | prompt "Host name?" "string" (cat $project `-` (randAlphaNum 8) | nospace ) }}
-
 {{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
-
-{{ $subnet := param "subnet" "string" "subnet" | prompt "Subnet?" "string" "subnet1" }}
-{{ $subnetKey := list `inventory` $project `networking/aws/ec2-subnet` (list $project $subnet | join `-`) `Properties` | join `/` }}
-
-{{ $azKey := list $subnetKey `AvailabilityZone` | join `/` }}
-{{ $az := metadata $azKey }}
-
-{{ $subnetIdKey := list $subnetKey `SubnetId` | join `/` }}
-{{ $subnetId := metadata $subnetIdKey }}
-
-{{ $cidrBlockKey := list $subnetKey `CidrBlock` | join `/` }}
-{{ $privateIp := param "private-ip" "string" "IP" | prompt "Private IP address?" "string" (metadata $cidrBlockKey) }}
-
-{{ $securityGroupIdKey := list `inventory` $project `networking/aws/ec2-securitygroup` (list $project `sg1` | join `-`) `Properties/GroupId` | join `/` }}
-
-{{ $securityGroupID := param "security-group-id" "string" "security group id" | prompt "Security group ID?" "string" (metadata $securityGroupIdKey) }}
+{{ $subnetId := param "subnet-id" "string" "subnet ID" | prompt "Subnet?" "string" "" }}
+{{ $az := param "az" "string" "availability zone" | prompt "AZ?" "string" "" }}
+{{ $privateIp := param "private-ip" "string" "IP" | prompt "Private IP address?" "string" "" }}
+{{ $securityGroupID := param "security-group-id" "string" "security group" | prompt "Security group ID?" "string" "" }}
 
 Tags:
   infrakit_scope: {{ $project }}
-  infrakit_created: {{ now | htmlDate }}
-  infrakit_user: {{ $user }}
 
 Init: |
   #!/bin/bash
@@ -42,7 +25,6 @@ Init: |
 Properties:
   Tags:
     Name: {{ $name }}
-    infrakit_user: {{ $user }}
   RunInstancesInput:
     BlockDeviceMappings: null
     DisableApiTermination: null

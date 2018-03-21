@@ -28,6 +28,10 @@ const (
 // Options has optional settings for a call.  It can be in a CLI (where Parameters are implemented by flags) or
 // programmatic, where Parameters are implemented as maps that can be set in a golang program.
 type Options struct {
+
+	// ShowAllWarnings will print all warnings to the console.
+	ShowAllWarnings bool
+
 	// Output is the writer used by the backend to write the result.  Typically it's stdout
 	OutputFunc func() io.Writer
 
@@ -78,7 +82,6 @@ type TemplateFunc func(url string, opts template.Options) (*template.Template, e
 
 // NewCallable creates a callable
 func NewCallable(scope scope.Scope, src string, parameters backend.Parameters, options Options) *Callable {
-
 	// Note that because Callable embeds Parameters and implements the methods in Parameters, a Callable
 	// can be nested inside another callable..
 	return &Callable{
@@ -596,6 +599,9 @@ func (c *Callable) DefineParameters() (err error) {
 
 	t.SetOptions(c.Options.TemplateOptions)
 	_, err = t.Render(c)
+	if err != nil && c.Options.ShowAllWarnings {
+		log.Warn("Error rendering playbook while defining params", "err", err)
+	}
 
 	// add the backend-defined flags. These are flags that are
 	// applied as the backend is chosen.  The delimiter here is =% %=

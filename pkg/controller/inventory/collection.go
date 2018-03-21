@@ -403,8 +403,8 @@ func (c *collection) stop() error {
 }
 
 func (c *collection) configureAccessor(spec types.Spec, name string, access *internal.InstanceAccess) error {
-	if access.Labels == nil {
-		access.Labels = map[string]string{}
+	if access.Select == nil {
+		access.Select = map[string]string{}
 	}
 
 	err := access.InstanceObserver.Validate(c.options.InstanceObserver)
