@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/docker/infrakit/pkg/run/scope"
-	"github.com/docker/infrakit/pkg/template"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/require"
 
@@ -24,7 +23,7 @@ command2 : file2
 group    : file3
 `
 
-	m, err := dir(SourceURL("str://"+buff), template.Options{})
+	m, err := dir(SourceURL("str://"+buff), Options{})
 	require.NoError(t, err)
 	require.Equal(t, Modules{
 		Op("command1"): SourceURL("file1"),
@@ -40,7 +39,7 @@ func TestLoadModules(t *testing.T) {
 
 	top := filepath.Join(pwd, "testdata/index.ikm")
 
-	options := template.Options{}
+	options := Options{}
 
 	root := SourceURL("file://" + top)
 	m, err := dir(root, options)
@@ -62,7 +61,7 @@ func TestLoadAll(t *testing.T) {
 		Op("testdata"): root,
 	}
 
-	modules, err := NewModules(scope.Nil, top, os.Stdin, template.Options{})
+	modules, err := NewModules(scope.Nil, top, os.Stdin, Options{})
 	require.NoError(t, err)
 
 	commands, err := modules.List()
