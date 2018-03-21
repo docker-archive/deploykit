@@ -19,7 +19,7 @@ func TestInstanceAccessMarshal(t *testing.T) {
 	access1 := new(InstanceAccess)
 	err := types.Decode([]byte(`
 plugin: simulator/compute
-labels:
+select:
   group: workers
   type: large
 observeinterval: 2s
@@ -52,7 +52,7 @@ func TestInstanceAccess(t *testing.T) {
 	access := new(InstanceAccess)
 	err := types.Decode([]byte(`
 plugin: simulator/compute
-labels:
+select:
   group: workers
   type: large
 observeinterval: 2s
@@ -85,7 +85,7 @@ properties:
 	require.Equal(t, map[string]string{
 		"group": "workers",
 		"type":  "large",
-	}, access.Labels)
+	}, access.Select)
 
 	lookup := make(chan string, 10)
 
@@ -130,7 +130,7 @@ properties:
 	access.Pause(false)
 
 	require.Equal(t, "simulator/compute", <-lookup)
-	require.Equal(t, []interface{}{access.Labels, true}, <-described)
+	require.Equal(t, []interface{}{access.Select, true}, <-described)
 
 	var seen []instance.Description
 

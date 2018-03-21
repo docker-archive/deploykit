@@ -16,7 +16,7 @@ func TestInstanceObserver(t *testing.T) {
 	observer := new(InstanceObserver)
 	err := types.Decode([]byte(`
 plugin: simulator/compute
-labels:
+select:
   group: workers
   type: large
 observeinterval: 2s
@@ -29,7 +29,7 @@ KeySelector: \{\{.link\}\}
 	require.Equal(t, map[string]string{
 		"group": "workers",
 		"type":  "large",
-	}, observer.Labels)
+	}, observer.Select)
 
 	lookup := make(chan string, 10)
 
@@ -64,7 +64,7 @@ KeySelector: \{\{.link\}\}
 	observer.Pause(false)
 
 	require.Equal(t, "simulator/compute", <-lookup)
-	require.Equal(t, []interface{}{observer.Labels, true}, <-called)
+	require.Equal(t, []interface{}{observer.Select, true}, <-called)
 
 	var seen []instance.Description
 
@@ -88,7 +88,7 @@ func TestInstanceObserverMultipleSamples(t *testing.T) {
 	observer := new(InstanceObserver)
 	err := types.Decode([]byte(`
 plugin: simulator/compute
-labels:
+select:
   group: workers
   type: large
 observeinterval: 2s
@@ -101,7 +101,7 @@ KeySelector: \{\{.link\}\}
 	require.Equal(t, map[string]string{
 		"group": "workers",
 		"type":  "large",
-	}, observer.Labels)
+	}, observer.Select)
 
 	// 2 samples with different values... link2 and link4 disappears
 	expected := [][]instance.Description{

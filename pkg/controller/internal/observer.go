@@ -22,8 +22,8 @@ type InstanceObserver struct {
 	// Plugin is the name of the instance plugin
 	Plugin plugin.Name
 
-	// Labels are the labels to use when querying for instances. This is the namespace.
-	Labels map[string]string
+	// Select are the labels to use when querying for instances. This is the namespace.
+	Select map[string]string
 
 	// ObserveInterval is the polling interval for making an observation
 	ObserveInterval types.Duration
@@ -99,7 +99,7 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 		retry)
 
 	o.observe = func() ([]instance.Description, error) {
-		return instancePlugin.DescribeInstances(o.Labels, true)
+		return instancePlugin.DescribeInstances(o.Select, true)
 	}
 
 	o.observations = make(chan []instance.Description, 10)
@@ -127,7 +127,7 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 			log.Debug("polling", "V", debugV2,
 				"freed", o.paused,
 				"plugin", o.Plugin,
-				"labels", o.Labels,
+				"select", o.Select,
 				"observed", len(instances))
 
 			// send the current observations
