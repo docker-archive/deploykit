@@ -1,7 +1,6 @@
 {{/* Input to create instance using the AWS instance plugin */}}
 {{/* =% instanceProvision `aws/ec2-subnet` %= */}}
 
-{{ $user := param "user" "string" "username" | prompt "Please enter your user name:" "string" (env "USER")}}
 {{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
 
 {{ $vpcID := param "vpcID" "string" "VPC ID" | prompt "VPC ID?" "string" }}
@@ -13,16 +12,13 @@
 
 Tags:
   infrakit_scope: {{ $project }}
-  infrakit_created: {{ now | htmlDate }}
-  infrakit_user: {{ $user }}
 
 Properties:
+  Tags:
+    Name: {{ $project }}-{{ $name }}
   CreateSubnetInput:
     VpcId : {{ $vpcID }}
     AvailabilityZone: {{ $az }}
     CidrBlock: {{ $cidr }}
   RouteTableAssociation:
     RouteTableId: {{ $routeTableID }}
-  Tags:
-    Name: {{ $project }}-{{ $name }}
-    infrakit_user: {{ $user }}

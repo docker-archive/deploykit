@@ -6,29 +6,29 @@ kind: inventory
 metadata:
   name: {{ $project }}
 options:
-  ObserveInterval: 5s
+  ObserveInterval: 60s
   KeySelector: "\\{\\{.Tags.Name\\}\\}"
 properties:
   networking:
     - plugin: aws/ec2-vpc
-      labels:
+      select:
         infrakit_scope : {{ $project }}
     - plugin: aws/ec2-internetgateway
-      labels:
+      select:
         infrakit_scope : {{ $project }}
     - plugin: aws/ec2-routetable
-      labels:
+      select:
         infrakit_scope : {{ $project }}
     - plugin: aws/ec2-subnet
-      labels:
+      select:
         infrakit_scope : {{ $project }}
     - plugin: aws/ec2-securitygroup
-      labels:
+      select:
         infrakit_scope : {{ $project }}
   compute:
     - plugin: aws/ec2-instance
-      labels:
+      select:
         infrakit_scope : {{ $project }}
     - plugin: aws/ec2-spot-instance
-      labels:
+      select:
         infrakit_scope : {{ $project }}

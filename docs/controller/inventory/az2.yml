@@ -8,7 +8,7 @@ options:
 properties:
   az2-net1:
     plugin: az2/net
-    labels:
+    select:
       az: az2
       type: network
     Properties:
@@ -16,7 +16,7 @@ properties:
       gateway: 10.20.0.1
   az2-disk0:
     plugin: az2/disk
-    labels:
+    select:
       az: az2
       type: storage
     Properties:
@@ -27,7 +27,7 @@ properties:
       size: 1TB
   az2-disk1:
     plugin: az2/disk
-    labels:
+    select:
       az: az2
       type: storage
     Properties:
@@ -38,7 +38,7 @@ properties:
       size: 2TB
   az2-disk2:
     plugin: az2/disk
-    labels:
+    select:
       az: az2
       type: storage
     Properties:
@@ -49,7 +49,7 @@ properties:
       size: 3TB
   az2-disk3:
     plugin: az2/disk
-    labels:
+    select:
       az: az2
       type: storage
     Properties:
@@ -60,7 +60,7 @@ properties:
       size: 4TB
   az2-disk4:
     plugin: az2/disk
-    labels:
+    select:
       az: az2
       type: storage
     Properties:

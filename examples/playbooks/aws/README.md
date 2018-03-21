@@ -88,7 +88,7 @@ properties:
     Properties:
       AttachInternetGatewayInput:
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
-    labels:
+    select:
       Name: myproject-igw
       infrakit_created: 2018-03-18
       infrakit_scope: myproject
@@ -101,7 +101,7 @@ properties:
         GatewayId: '@depend(''igw/Properties/InternetGatewayId'')@'
       CreateRouteTableInput:
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
-    labels:
+    select:
       Name: myproject-rtb
       infrakit_created: 2018-03-18
       infrakit_scope: myproject
@@ -122,7 +122,7 @@ properties:
         Description: basic-sg
         GroupName: myproject-sg1
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
-    labels:
+    select:
       Name: myproject-sg1
       infrakit_created: 2018-03-18
       infrakit_scope: myproject
@@ -136,7 +136,7 @@ properties:
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
       RouteTableAssociation:
         RouteTableId: '@depend(''rtb/Properties/RouteTableId'')@'
-    labels:
+    select:
       Name: myproject-subnet1
       infrakit_created: 2018-03-18
       infrakit_scope: myproject
@@ -150,7 +150,7 @@ properties:
         VpcId: '@depend(''vpc/Properties/VpcId'')@'
       RouteTableAssociation:
         RouteTableId: '@depend(''rtb/Properties/RouteTableId'')@'
-    labels:
+    select:
       Name: myproject-subnet2
       infrakit_created: 2018-03-18
       infrakit_scope: myproject
@@ -165,7 +165,7 @@ properties:
           Value: true
       - EnableDnsHostnames:
           Value: true
-    labels:
+    select:
       Name: myproject-vpc
       infrakit_created: 2018-03-18
       infrakit_scope: myproject

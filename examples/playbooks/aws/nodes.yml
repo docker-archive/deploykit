@@ -1,0 +1,65 @@
+{{/* =% text %= */}}
+
+{{ $subnet := param "subnet" "string" "subnet" | prompt "Subnet?" "string" "subnet2" }}
+
+{{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
+
+{{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
+
+{{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
+
+{{ $spotPrice := param "spot-price" "string" "Spot price" | prompt "Spot price?" "string" "0.03" }}
+
+{{/* subnet id from subnet name */}}
+{{ $project := metadata `mystack/vars/project` }}
+
+{{ $subnetKey := list `resource` $project $subnet `Properties` | join `/` }}
+
+{{ $subnetId := list $subnetKey `SubnetId` | join `/` | metadata }}
+{{ $az := list $subnetKey `AvailabilityZone` | join `/` | metadata }}
+{{ $cidr := list $subnetKey `CidrBlock` | join `/` | metadata }}
+
+{{ $securityGroupKey := list `resource` $project `sg1` `Properties` | join `/` }}
+{{ $securityGroupID := list $securityGroupKey `GroupId` | join `/` | metadata }}
+
+{{ $privateIp := param "private-ip" "string" "IP" | prompt "Private IP address?" "string" $cidr }}
+
+kind: resource
+metadata:
+  name: {{ $project }}-nodes
+options:
+  ObserveInterval: 10s
+properties:
+
+
+  host1:
+    plugin: aws/ec2-spot-instance
+    select:
+      Name: {{ $project }}-host1
+      infrakit_scope: {{ $project }}
+    init: |
+      #!/bin/bash
+      sudo add-apt-repository ppa:gophers/archive
+      sudo apt-get update -y
+      sudo apt-get install -y wget curl git golang-1.9-go
+      wget -qO- https://get.docker.com | sh
+      ln -s /usr/lib/go-1.9/bin/go /usr/local/bin/go
+    properties:
+      RequestSpotInstancesInput:
+        SpotPrice: "{{ $spotPrice }}"
+        Type: one-time
+        LaunchSpecification:
+          ImageId: {{ $imageId }}
+          InstanceType: {{ $instanceType }}
+          KeyName: {{ $keyName }}
+          NetworkInterfaces:
+            - AssociatePublicIpAddress: true
+              DeleteOnTermination: true
+              DeviceIndex: 0
+              Groups:
+                - {{ $securityGroupID }}
+              NetworkInterfaceId: null
+              PrivateIpAddress: {{ $privateIp  }}
+              SubnetId: {{ $subnetId }}
+          Placement:
+            AvailabilityZone: {{ $az }}

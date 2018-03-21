@@ -2,29 +2,23 @@
 # Start infrakit
 start : start.sh
 
-# The resource config for entire mystack
-mystack : mystack.yml
-
-# Creates a vpc
-vpc : provision-vpc.yml
-
-# Creates a subnet
-subnet : provision-subnet.yml
-
-# Creates a security group
-sg : provision-securitygroup.yml
-
-# Creates and attaches an internet gateway to VPC
-gateway : provision-gateway.yml
-
-# Creates a routetable and associate to VPC and subnet
-routetable : provision-routetable.yml
-
-# Create a single instance
-ondemand : provision-instance.yml
-
-# Create a spot instance
-spot : provision-spot-instance.yml
+# vars - sets the variables
+vars : vars.sh
 
 # Configuration for inventory controller
-inventory.yml : inventory.yml
+inventory : inventory.yml
+
+# The resource config for entire mystack
+phase1 : mystack.yml
+
+# The resource config for nodes after phase1
+phase2 : nodes.yml
+
+# The specific resources we can provision
+resources : resources/index.yml
+
+# Create a single instance
+ondemand : resources/provision-instance.yml
+
+# Create a spot instance
+spot : resources/provision-spot-instance.yml

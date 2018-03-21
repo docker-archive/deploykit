@@ -8,7 +8,7 @@ options:
 properties:
   az1-net1:
     plugin: az1/net
-    labels:
+    select:
       az: az1
       type: network
     ObserveInterval: 1s                               # optional - specified here to control polling interval
@@ -18,7 +18,7 @@ properties:
       gateway: 10.20.0.1
   az1-disk0:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -29,7 +29,7 @@ properties:
       size: 1TB
   az1-disk1:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -40,7 +40,7 @@ properties:
       size: 2TB
   az1-disk2:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -51,7 +51,7 @@ properties:
       size: 3TB
   az1-disk3:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -62,7 +62,7 @@ properties:
       size: 4TB
   az1-disk4:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -73,7 +73,7 @@ properties:
       size: 5TB
   az1-disk5:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -84,7 +84,7 @@ properties:
       size: 6TB
   az1-disk6:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -95,7 +95,7 @@ properties:
       size: 7TB
   az1-disk7:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -106,7 +106,7 @@ properties:
       size: 8TB
   az1-disk8:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
@@ -117,7 +117,7 @@ properties:
       size: 9TB
   az1-disk9:
     plugin: az1/disk
-    labels:
+    select:
       az: az1
       type: storage
     Properties:
