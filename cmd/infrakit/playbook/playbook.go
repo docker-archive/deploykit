@@ -83,8 +83,10 @@ func Command(scope scope.Scope) *cobra.Command {
 					map[playbook.Op]playbook.SourceURL{
 						playbook.Op(name): playbook.SourceURL(source),
 					},
-					os.Stdin, template.Options{
-						CacheDir: cacheDir,
+					os.Stdin, playbook.Options{
+						Options: template.Options{
+							CacheDir: cacheDir,
+						},
 					})
 				if err != nil {
 					return err
