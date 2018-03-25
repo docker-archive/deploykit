@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/docker/infrakit/pkg/controller/internal"
@@ -355,7 +356,13 @@ func (c *collection) run(ctx context.Context) {
 					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor,
 						"watch", c.destroyWatch, "watching", c.destroyWatching)
 
-					// check to see if we are clear to destroy
+					// Check to see if we are clear to destroy.
+					// Generally, okToDestroy is the easiest to check since it's updated with
+					// the key of the resource that has met all dependencies for destroy; however,
+					// for all the first resources that don't depend on anything else, the okToDestroy
+					// would never be populated because there are no dependencies that needs to be met
+					// in the first place.  So we need to check to see if the item is watching anything else.
+					// If the item is not watching anything at this time, then it's safe to destroy.
 					if _, has := okToDestroy[item.Key]; !has {
 
 						if watchers, deps := c.destroyWatching[item.Key]; deps {
@@ -689,11 +696,25 @@ func processProvisionWatches(properties resource.Properties) (watch *Watch, watc
 		watchers := Watchers{}
 
 		// get a list of dependencies from the Spec properties
-		for _, path := range types.ParseDepends(access.Spec.Properties) {
+		any, err := types.AnyValue(access.Spec)
+		if err != nil {
+			log.Error("Error parsing spec", "spec", access.Spec, "err", err)
+			continue
+		}
+
+		for _, path := range types.ParseDepends(any) {
 
 			dependedOnKey, err := keyFromPath(path)
 			if err != nil {
 				log.Error("bad dep path", "err", err)
+				continue
+			}
+
+			// We only allow a modifier called post-provision: when we consider the dependencies.
+			// This is so that provisioning of a resource can be gated by the post-provisioning step / data of another.
+			// For all practical purposes, this is like a totally different key the object will watch.  If this is never
+			// fulfilled, the watcher will be blocked forever from being provisioned.
+			if i := strings.Index(dependedOnKey, ":"); i > 0 && dependedOnKey[0:i] != "post-provision" {
 				continue
 			}
 
@@ -716,11 +737,23 @@ func processDestroyWatches(properties resource.Properties) (watch *Watch, watchi
 		// Get a list of dependencies from the Spec properties
 		// For an item X this returns a list of items X depends ON.
 
-		for _, path := range types.ParseDepends(access.Spec.Properties) {
+		// get a list of dependencies from the Spec properties, including init
+		any, err := types.AnyValue(access.Spec)
+		if err != nil {
+			log.Error("Error parsing spec", "spec", access.Spec, "err", err)
+			continue
+		}
+		for _, path := range types.ParseDepends(any) {
 
 			dependedOnKey, err := keyFromPath(path)
 			if err != nil {
 				log.Error("bad dep path", "err", err)
+				continue
+			}
+
+			// Disallow any modifiers because we don't care about modifiers like post-provision (which is
+			// not a valid dependency for termination of this resource.
+			if strings.Index(dependedOnKey, ":") > 0 {
 				continue
 			}
 
