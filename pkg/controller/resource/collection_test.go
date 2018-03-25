@@ -62,14 +62,94 @@ func TestGetByPath(t *testing.T) {
 	require.Equal(t, "1TB", types.Get(types.PathFromString(`disk1/Properties/size`), m))
 }
 
-func TestProcessWatches(t *testing.T) {
+func TestProcessProvisionWatches(t *testing.T) {
 
 	properties := testProperties(t)
-	watch, watching := processWatches(properties)
+	provisionWatch, provisionWatching := processProvisionWatches(properties)
 
 	// check the file... count the number of occurrences
-	require.Equal(t, 5, len(watch.watchers["az1-net1"]))
-	require.Equal(t, 2, len(watch.watchers["az2-net2"]))
-	require.Equal(t, 1, len(watching["az1-net2"]))
+	require.Equal(t, 5, len(provisionWatch.watchers["az1-net1"]))
+	require.Equal(t, 2, len(provisionWatch.watchers["az2-net2"]))
+	require.Equal(t, 1, len(provisionWatching["az1-net2"]))
+}
+
+func TestProcessDestroyWatches(t *testing.T) {
+
+	properties := testProperties(t)
+	destroyWatch, destroyWatching := processDestroyWatches(properties)
+
+	// check the file... count the number of occurrences
+	require.Equal(t, 0, len(destroyWatch.watchers["az1-net1"]))
+	require.Equal(t, 1, len(destroyWatch.watchers["az2-net2"]))
+	require.Equal(t, 1, len(destroyWatch.watchers["az1-net2"]))
+	require.Equal(t, 2, len(destroyWatching["az1-net2"]))
+}
+
+func TestProcessDestroyWatches2(t *testing.T) {
+
+	buff := []byte(`
+kind: resource
+metadata:
+  name: resources
+options:
+  WaitBeforeProvision: 100
+properties:
+  A:
+    plugin: az1/net
+    Properties:
+      prop1: A-1
+      prop2: A-2
+  B:
+    plugin: az1/net
+    Properties:
+      wait: "@depend('A/ID')@"
+      prop1: B-1
+      prop2: B-2
+  C:
+    plugin: az1/net
+    Properties:
+      wait1: "@depend('A/ID')@"
+      wait2: "@depend('B/ID')@"
+      prop1: C-1
+      prop2: C-2
+  D:
+    plugin: az1/net
+    Properties:
+      wait1: "@depend('A/ID')@"
+      wait2: "@depend('B/ID')@"
+      wait3: "@depend('C/ID')@"
+      prop1: D-1
+      prop2: D-2
+`)
+
+	var spec types.Spec
+	err := types.Decode(buff, &spec)
+	require.NoError(t, err)
+
+	properties := DefaultProperties
+	err = spec.Properties.Decode(&properties)
+	require.NoError(t, err)
+
+	// Provisioning order ==> B depends on A, so A must run before B
+	provisionWatch, provisionWatching := processProvisionWatches(properties)
+	require.Equal(t, 3, len(provisionWatch.watchers["A"])) // To provision, 3 depends on A
+	require.Equal(t, 0, len(provisionWatching["A"]))       // A depends on 0
+	require.Equal(t, 2, len(provisionWatch.watchers["B"])) // 2 depends on B
+	require.Equal(t, 1, len(provisionWatching["B"]))       // B depends on 1 (A)
+	require.Equal(t, 1, len(provisionWatch.watchers["C"])) // D
+	require.Equal(t, 2, len(provisionWatching["C"]))       // A and B
+	require.Equal(t, 0, len(provisionWatch.watchers["D"])) // 0 watchers on D
+	require.Equal(t, 3, len(provisionWatching["D"]))       // A, B, C
+
+	// Destroy order ==> in reverse
+	destroyWatch, destroyWatching := processDestroyWatches(properties)
+	require.Equal(t, 0, len(destroyWatch.watchers["A"])) // 0 waits for A to be destroyed before it can be destroyed.
+	require.Equal(t, 3, len(destroyWatching["A"]))       // 3 references A so A is watching on 3
+	require.Equal(t, 1, len(destroyWatch.watchers["B"])) // A waits on B
+	require.Equal(t, 2, len(destroyWatching["B"]))       // C and D
+	require.Equal(t, 2, len(destroyWatch.watchers["C"])) // A and B
+	require.Equal(t, 1, len(destroyWatching["C"]))       // D
+	require.Equal(t, 3, len(destroyWatch.watchers["D"])) // A, B, C
+	require.Equal(t, 0, len(destroyWatching["D"]))       // 0
 
 }

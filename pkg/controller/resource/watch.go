@@ -43,9 +43,11 @@ func (w *Watch) notify(name string) {
 	defer w.lock.RUnlock()
 
 	watchers, has := w.watchers[name]
-	if !has {
+
+	if !has || len(watchers) == 0 {
 		return
 	}
+	log.Debug("Notify", "name", name, "watchers", watchers, "V", debugV)
 	watchers.Notify()
 }
 

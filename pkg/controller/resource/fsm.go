@@ -104,8 +104,10 @@ const (
 	requested fsm.Index = iota
 	provisioning
 	waiting
+	waitingTerminate
 	ready
 	cannotProvision
+	cannotTerminate
 	unmatched
 	terminating
 	terminated
@@ -118,6 +120,7 @@ const (
 	dependencyMissing
 	dependencyReady
 	terminate
+	terminateError
 	cleanup
 )
 
@@ -175,6 +178,7 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 			Transitions: map[fsm.Signal]fsm.Index{
 				dependencyMissing: waiting,
 				resourceFound:     ready,
+				provisionError:    cannotProvision,
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				dependencyMissing: func(n fsm.FSM) error {
@@ -188,11 +192,24 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 			},
 		},
 		fsm.State{
+			Index: terminating,
+			Transitions: map[fsm.Signal]fsm.Index{
+				dependencyMissing: waitingTerminate,
+				resourceLost:      terminated,
+				terminateError:    cannotTerminate,
+			},
+			Actions: map[fsm.Signal]fsm.Action{
+				dependencyMissing: func(n fsm.FSM) error {
+					model.instancePendingChan <- n
+					return nil
+				},
+			},
+		},
+		fsm.State{
 			Index: waiting,
 			Transitions: map[fsm.Signal]fsm.Index{
 				dependencyMissing: waiting,
 				dependencyReady:   provisioning,
-				provisionError:    cannotProvision,
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				dependencyReady: func(n fsm.FSM) error {
@@ -202,20 +219,42 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 			},
 		},
 		fsm.State{
+			Index: waitingTerminate,
+			Transitions: map[fsm.Signal]fsm.Index{
+				dependencyMissing: waitingTerminate,
+				dependencyReady:   terminating,
+				resourceLost:      terminated,
+			},
+			Actions: map[fsm.Signal]fsm.Action{
+				dependencyReady: func(n fsm.FSM) error {
+					model.instanceDestroyChan <- n
+					return nil
+				},
+			},
+		},
+		fsm.State{
 			Index: ready,
 			Transitions: map[fsm.Signal]fsm.Index{
 				resourceLost:  provisioning,
 				resourceFound: ready, // just loops back to self in the ready state
+				terminate:     terminating,
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				resourceLost: func(n fsm.FSM) error {
 					model.instanceProvisionChan <- n
 					return nil
 				},
+				terminate: func(n fsm.FSM) error {
+					model.instanceDestroyChan <- n
+					return nil
+				},
 			},
 		},
 		fsm.State{
 			Index: cannotProvision,
+		},
+		fsm.State{
+			Index: cannotTerminate,
 		},
 		fsm.State{
 			Index: unmatched,
@@ -231,16 +270,10 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 			},
 		},
 		fsm.State{
-			Index: terminating,
-			Transitions: map[fsm.Signal]fsm.Index{
-				resourceLost: terminated,
-			},
-		},
-		fsm.State{
 			Index: terminated,
 			TTL:   fsm.Expiry{options.WaitBeforeDestroy, cleanup},
 			Transitions: map[fsm.Signal]fsm.Index{
-				cleanup: terminated, // TODO - this is really unnecessary
+				cleanup: terminated, // This is really unnecessary, just here to trigger the cleanup action
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				cleanup: func(n fsm.FSM) error {
@@ -256,14 +289,16 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 	}
 
 	spec.SetStateNames(map[fsm.Index]string{
-		requested:       "REQUESTED",
-		ready:           "READY",
-		provisioning:    "PROVISIONING",
-		waiting:         "WAITING",
-		cannotProvision: "CANNOT_PROVISION",
-		unmatched:       "UNMATCHED",
-		terminating:     "TERMINATING",
-		terminated:      "TERMINATED",
+		requested:        "REQUESTED",
+		ready:            "READY",
+		provisioning:     "PROVISIONING",
+		waiting:          "WAITING_PROVISION",
+		waitingTerminate: "WAITING_TERMINATE",
+		cannotProvision:  "CANNOT_PROVISION",
+		cannotTerminate:  "CANNOT_TERMINATE",
+		unmatched:        "UNMATCHED",
+		terminating:      "TERMINATING",
+		terminated:       "TERMINATED",
 	}).SetSignalNames(map[fsm.Signal]string{
 		resourceFound:     "resource_found",
 		resourceLost:      "resource_lost",
@@ -271,6 +306,7 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 		terminate:         "terminate",
 		cleanup:           "cleanup",
 		provisionError:    "provision_error",
+		terminateError:    "terminate_error",
 		dependencyMissing: "dependency_missing",
 		dependencyReady:   "dependency_ready",
 	})
