@@ -71,7 +71,7 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 				}
 
 				// show collections only from spec.State
-				format := "%-20s  %-15s  %-15s  %-15s\n"
+				format := "%-20s  %-20s  %-20s  %-20s\n"
 				rows := map[string]string{}
 				keys := types.Paths{}
 

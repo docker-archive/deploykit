@@ -16,7 +16,7 @@ type Operation int
 
 const (
 	// Enforce represents create, update, reconcile operations
-	Enforce = iota
+	Enforce Operation = iota
 
 	// Destroy is the destroy operation. Destroy also implies Free.
 	Destroy

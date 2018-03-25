@@ -19,6 +19,10 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 	}
 	commit.Flags().AddFlagSet(services.ProcessTemplateFlags)
 
+	destroyConfirm := false
+	destroy := commit.Flags().Bool("destroy-all", false, "Destroy all resources under management.")
+	commit.Flags().BoolVarP(&destroyConfirm, "destroy-all-confirm", "c", false, "Confirm destruction")
+
 	commit.RunE = func(cmd *cobra.Command, args []string) error {
 
 		if len(args) != 1 {
@@ -46,7 +50,16 @@ func Commit(name string, services *cli.Services) *cobra.Command {
 			return err
 		}
 
-		object, err := c.Commit(controller.Enforce, spec)
+		op := controller.Enforce
+		if *destroy {
+			op = controller.Destroy
+			if !destroyConfirm {
+				fmt.Fprintln(os.Stderr, "Canceled because --destroy-all-confirm isn't set.")
+				return nil
+			}
+		}
+
+		object, err := c.Commit(op, spec)
 		if err != nil {
 			return err
 		}

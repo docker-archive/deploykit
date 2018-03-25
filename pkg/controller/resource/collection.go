@@ -27,9 +27,11 @@ type collection struct {
 
 	deleted map[string]*internal.InstanceAccess
 
-	watch    *Watch
-	watching map[string]Watchers
-	cancel   func()
+	provisionWatch    *Watch
+	provisionWatching map[string]Watchers
+	destroyWatch      *Watch
+	destroyWatching   map[string]Watchers
+	cancel            func()
 }
 
 var (
@@ -74,17 +76,20 @@ func newCollection(scope scope.Scope, options resource.Options) (internal.Manage
 		return nil, err
 	}
 	c := &collection{
-		Collection: base,
-		options:    options,
-		watch:      &Watch{},
-		resources:  resources{},
-		watching:   map[string]Watchers{},
-		deleted:    map[string]*internal.InstanceAccess{},
+		Collection:        base,
+		options:           options,
+		provisionWatch:    &Watch{},
+		provisionWatching: map[string]Watchers{},
+		destroyWatch:      &Watch{},
+		destroyWatching:   map[string]Watchers{},
+		resources:         resources{},
+		deleted:           map[string]*internal.InstanceAccess{},
 	}
 	// set the behaviors
 	base.StartFunc = c.run
 	base.StopFunc = c.stop
 	base.UpdateSpecFunc = c.updateSpec
+	base.TerminateFunc = c.terminate
 
 	return c, nil
 }
@@ -149,10 +154,6 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 		log.Debug("Initialized INCLUDED accessor", "name", name, "spec", spec, "access", accessors[name], "V", debugV)
 	}
 
-	log.Debug("Process watches / dependencies")
-	watch, watching := processWatches(properties)
-	log.Debug("watch/watching", "watch", watch, "watching", watching)
-
 	// Handle deletion
 
 	deleted := map[string]*internal.InstanceAccess{}
@@ -179,6 +180,14 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 	}
 	c.deleted = deleted
 
+	log.Debug("Process provisioning watches / dependencies")
+	provisionWatch, provisionWatching := processProvisionWatches(properties)
+	log.Debug("provisionWatch/provsionWatching", "watch", provisionWatch, "watching", provisionWatching)
+
+	log.Debug("Process destroy watches / dependencies")
+	destroyWatch, destroyWatching := processDestroyWatches(properties)
+	log.Debug("destroynWatch/destroyWatching", "watch", destroyWatch, "watching", destroyWatching)
+
 	// build the fsm model
 	var model *Model
 	model, err = BuildModel(properties, options)
@@ -190,8 +199,10 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 	c.model = model
 	c.options = options
 
-	c.watch = watch
-	c.watching = watching
+	c.provisionWatch = provisionWatch
+	c.provisionWatching = provisionWatching
+	c.destroyWatch = destroyWatch
+	c.destroyWatching = destroyWatching
 
 	return
 }
@@ -211,7 +222,6 @@ func (c *collection) run(ctx context.Context) {
 		instances []instance.Description
 	}
 
-	dependencyComplete := make(chan *observation, len(c.accessors))
 	accessors := map[string]*internal.InstanceAccess{}
 
 	for n, a := range c.accessors {
@@ -225,12 +235,25 @@ func (c *collection) run(ctx context.Context) {
 	c.cancel = cancel
 
 	// Start all the watchers that have any dependencies
-	for k, w := range c.watching {
+	provisionDependencyComplete := make(chan *observation, len(c.accessors))
+	for k, w := range c.provisionWatching {
 		ch := w.FanIn(ctx)
 		go func(n string) {
 			<-ch
 			// send event we got dependency satisified
-			dependencyComplete <- &observation{name: n}
+			provisionDependencyComplete <- &observation{name: n}
+		}(k)
+		log.Debug("aggregator", "key", k, "watch", w)
+	}
+
+	// Start all the watchers that have any dependencies
+	destroyDependencyComplete := make(chan *observation, len(c.accessors))
+	for k, w := range c.destroyWatching {
+		ch := w.FanIn(ctx)
+		go func(n string) {
+			<-ch
+			// send event we got dependency satisified
+			destroyDependencyComplete <- &observation{name: n}
 		}(k)
 		log.Debug("aggregator", "key", k, "watch", w)
 	}
@@ -275,6 +298,8 @@ func (c *collection) run(ctx context.Context) {
 
 	go func() {
 
+		okToDestroy := map[string]int{}
+
 	loop:
 		for {
 
@@ -308,11 +333,13 @@ func (c *collection) run(ctx context.Context) {
 				}
 				item := c.Collection.GetByFSM(f)
 				if item != nil {
+
+					msg := fmt.Sprintf("%v : resource blocked waiting on dependencies", item.State)
 					c.EventCh() <- event.Event{
 						Topic:   c.Topic(TopicPending),
 						Type:    event.Type("Pending"),
 						ID:      c.EventID(item.Key),
-						Message: "resource blocked waiting on dependencies",
+						Message: msg,
 					}.Init()
 				}
 
@@ -325,7 +352,20 @@ func (c *collection) run(ctx context.Context) {
 				if item != nil {
 
 					accessor := c.accessors[item.Key]
-					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor)
+					log.Info("Destroy", "fsm", f.ID(), "item", item, "accessor", accessor,
+						"watch", c.destroyWatch, "watching", c.destroyWatching)
+
+					// check to see if we are clear to destroy
+					if _, has := okToDestroy[item.Key]; !has {
+
+						if watchers, deps := c.destroyWatching[item.Key]; deps {
+
+							log.Error("cannot destroy because of dependencies", "item", item.Key, "watchers", len(watchers))
+							item.State.Signal(dependencyMissing)
+
+							continue
+						}
+					}
 
 					// !!!! This actually is *always* nil in the case where the accessor
 					// section has been removed and we discover an instance that doesn't
@@ -357,19 +397,26 @@ func (c *collection) run(ctx context.Context) {
 						log.Debug("destroy", "instanceID", dd.ID, "key", item.Key, "err", err)
 
 						if err != nil {
+
+							log.Error("Cannot destroy", "err", err)
+							item.State.Signal(terminateError)
+
 							c.EventCh() <- event.Event{
 								Topic:   c.Topic(TopicDestroyErr),
 								Type:    event.Type("DestroyErr"),
 								ID:      c.EventID(item.Key),
 								Message: "destroying resource error",
 							}.Init().WithError(err)
+
 						} else {
+
 							c.EventCh() <- event.Event{
 								Topic:   c.Topic(TopicDestroy),
 								Type:    event.Type("Destroy"),
 								ID:      c.EventID(item.Key),
-								Message: "destroyed resource",
+								Message: "destroying resource",
 							}.Init()
+
 						}
 					}
 				}
@@ -439,16 +486,32 @@ func (c *collection) run(ctx context.Context) {
 					}()
 				}
 
-			case haveAllData, ok := <-dependencyComplete:
+			case haveAllData, ok := <-provisionDependencyComplete:
 				if !ok {
-					log.Info("All haveAllData done")
+					log.Info("Provision haveAllData done")
 					return
 				}
 				// Signal that we have all dependencies met for a given object
 				item := c.Collection.Get(haveAllData.name)
 				if item != nil {
-					log.Debug("Met all dependencies", "name", haveAllData.name, "V", debugV)
+					log.Debug("Provision: met all dependencies", "name", haveAllData.name, "V", debugV)
 					item.State.Signal(dependencyReady)
+				}
+
+			case haveAllData, ok := <-destroyDependencyComplete:
+				if !ok {
+					log.Info("Destroy haveAllData done")
+					return
+				}
+				// Signal that we have all dependencies met for a given object
+				item := c.Collection.Get(haveAllData.name)
+				if item != nil {
+
+					okToDestroy[item.Key] = 1
+
+					log.Debug("Destroy : met all dependencies", "name", haveAllData.name, "V", debugV)
+					item.State.Signal(dependencyReady)
+
 				}
 
 			case lost, ok := <-lostInstances:
@@ -474,8 +537,12 @@ func (c *collection) run(ctx context.Context) {
 					}
 
 					if item := c.Collection.Get(k); item != nil {
-						log.Error("lost", "instance", n, "name", lost.name, "key", k)
 						item.State.Signal(resourceLost)
+						log.Error("lost", "instance", n, "name", lost.name, "key", k)
+
+						// Notify watchers if any
+						c.destroyWatch.Notify(k)
+						log.Debug("lost notified destroyWatch", "instance", n, "name", lost.name, "key", k, "V", debugV2)
 					}
 					delete(c.resources, k)
 				}
@@ -528,7 +595,7 @@ func (c *collection) run(ctx context.Context) {
 					c.resources[k] = n
 
 					// Notify watchers if any
-					c.watch.Notify(k)
+					c.provisionWatch.Notify(k)
 
 					log.Debug("found", "instance", n, "name", found.name, "key", k, "V", debugV2)
 					item.State.Signal(resourceFound)
@@ -552,6 +619,16 @@ func (c *collection) run(ctx context.Context) {
 	}
 
 	log.Debug("Seeded instances. Running.")
+}
+
+func (c *collection) terminate() error {
+
+	c.Visit(func(item internal.Item) bool {
+		item.State.Signal(terminate)
+		return true
+	})
+
+	return nil
 }
 
 func (c *collection) stop() error {
@@ -604,7 +681,7 @@ func keyFromPath(path types.Path) (key string, err error) {
 	return
 }
 
-func processWatches(properties resource.Properties) (watch *Watch, watching map[string]Watchers) {
+func processProvisionWatches(properties resource.Properties) (watch *Watch, watching map[string]Watchers) {
 	watch = &Watch{}
 	watching = map[string]Watchers{}
 
@@ -614,7 +691,7 @@ func processWatches(properties resource.Properties) (watch *Watch, watching map[
 		// get a list of dependencies from the Spec properties
 		for _, path := range types.ParseDepends(access.Spec.Properties) {
 
-			key, err := keyFromPath(path)
+			dependedOnKey, err := keyFromPath(path)
 			if err != nil {
 				log.Error("bad dep path", "err", err)
 				continue
@@ -622,10 +699,43 @@ func processWatches(properties resource.Properties) (watch *Watch, watching map[
 
 			w := make(chan struct{})
 			watchers = append(watchers, w)
-			watch.Add(key, w)
+			watch.Add(dependedOnKey, w)
 		}
 
 		watching[key] = watchers
+	}
+	return
+}
+
+func processDestroyWatches(properties resource.Properties) (watch *Watch, watching map[string]Watchers) {
+	watch = &Watch{}
+	watching = map[string]Watchers{}
+
+	for key, access := range properties {
+
+		// Get a list of dependencies from the Spec properties
+		// For an item X this returns a list of items X depends ON.
+
+		for _, path := range types.ParseDepends(access.Spec.Properties) {
+
+			dependedOnKey, err := keyFromPath(path)
+			if err != nil {
+				log.Error("bad dep path", "err", err)
+				continue
+			}
+
+			_, has := watching[dependedOnKey]
+			if !has {
+				watching[dependedOnKey] = Watchers{}
+			}
+
+			// add THIS (X) as the object that the depended on object is watching
+			w := make(chan struct{})
+			watching[dependedOnKey] = append(watching[dependedOnKey], w)
+
+			watch.Add(key, w)
+		}
+
 	}
 	return
 }

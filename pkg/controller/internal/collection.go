@@ -556,15 +556,16 @@ func (c *Collection) Free() (*types.Object, error) {
 
 // Terminate destroys the resources associated with this collection.
 func (c *Collection) Terminate() (object *types.Object, err error) {
+	object, err = c.Inspect()
+	if err != nil {
+		return
+	}
 	err = c.writeTxn(func() error {
 		if c.TerminateFunc != nil {
 			return c.TerminateFunc()
 		}
 		return fmt.Errorf("not supported")
 	})
-	if err == nil {
-		object, err = c.Inspect()
-	}
 	return
 }
 
