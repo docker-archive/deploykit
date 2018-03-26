@@ -13,7 +13,8 @@ properties:
       type: network
     ObserveInterval: 1s                               # optional - specified here to control polling interval
     KeySelector: \{\{.Tags.infrakit_instance\}\}      # optional specified here to control key extraction
-    Properties:
+    properties:
+      name: network:az1-net1
       cidr: 10.20.100.0/24
       gateway: 10.20.0.1
   az1-disk0:
@@ -21,7 +22,9 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    init: |
+      echo "The network is {{ depend `az1-net1/Properties/name` }}"
+    properties:
       dep: {{ depend `az1-net1/ID` }}
       depname: {{ depend `az1-net1/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -32,7 +35,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk0/ID` }}
       depname: {{ depend `az1-disk0/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -43,7 +46,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk1/ID` }}
       depname: {{ depend `az1-disk1/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -54,7 +57,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk2/ID` }}
       depname: {{ depend `az1-disk2/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -65,7 +68,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk3/ID` }}
       depname: {{ depend `az1-disk3/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -76,7 +79,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk4/ID` }}
       depname: {{ depend `az1-disk4/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -87,7 +90,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk5/ID` }}
       depname: {{ depend `az1-disk5/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -98,7 +101,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk6/ID` }}
       depname: {{ depend `az1-disk6/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -109,7 +112,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk7/ID` }}
       depname: {{ depend `az1-disk7/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}
@@ -120,7 +123,7 @@ properties:
     select:
       az: az1
       type: storage
-    Properties:
+    properties:
       dep: {{ depend `az1-disk8/ID` }}
       depname: {{ depend `az1-disk8/Tags/infrakit_instance` }}
       gw: {{ depend `az1-net1/Properties/gateway` }}

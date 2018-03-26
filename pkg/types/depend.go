@@ -39,6 +39,11 @@ func (d Depend) Parse() (found []Path, hasMatches bool) {
 // all expression within and substitute values from the fetcher.
 func EvalDepends(v interface{}, fetcher func(Path) (interface{}, error)) interface{} {
 	switch v := v.(type) {
+	case *Any:
+		var f interface{}
+		if err := v.Decode(&f); err == nil {
+			return EvalDepends(f, fetcher)
+		}
 	case map[string]interface{}:
 		for k, vv := range v {
 			v[k] = EvalDepends(vv, fetcher)

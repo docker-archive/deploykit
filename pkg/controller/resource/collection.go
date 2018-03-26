@@ -778,34 +778,41 @@ func processDestroyWatches(properties resource.Properties) (watch *Watch, watchi
 // into the final form with all the dependencies substituted.
 func (c *collection) populateDependencies(resourceName string, spec instance.Spec) (instance.Spec, error) {
 
-	processed := spec
-	var properties interface{}
-	err := types.Decode(processed.Properties.Bytes(), &properties)
+	// Turn the spec into a blob and use that to parse the dependencies
+	specAny, err := types.AnyValue(spec)
 	if err != nil {
 		return spec, err
 	}
 
-	properties = types.EvalDepends(properties,
+	evaled := types.EvalDepends(specAny,
 		func(p types.Path) (interface{}, error) {
 			v := types.Get(p, c.resources)
 			return v, nil
 		}) // should have all values populated
 
-	any, err := types.AnyValue(properties)
+	specAny, err = types.AnyValue(evaled)
+	if err != nil {
+		return spec, err
+	}
+	if depends := types.ParseDepends(specAny); len(depends) > 0 {
+		return spec, fmt.Errorf("missing data %v", specAny.String())
+	}
+
+	// Now take the whole thing and decode into a Spec
+	processed := spec
+
+	err = specAny.Decode(&processed)
 	if err != nil {
 		return spec, err
 	}
 
-	if depends := types.ParseDepends(any); len(depends) > 0 {
-		return spec, fmt.Errorf("missing data %v", any.String())
+	if processed.Tags == nil {
+		processed.Tags = map[string]string{}
 	}
 
-	processed.Properties = any
-
-	processed.Tags = map[string]string{
-		internal.InstanceLabel:   resourceName,
-		internal.CollectionLabel: c.Collection.Spec.Metadata.Name,
-	}
+	processed.Tags[internal.InstanceLabel] = resourceName
+	processed.Tags[internal.CollectionLabel] = c.Collection.Spec.Metadata.Name
+	processed.Tags[internal.SpecHash] = types.Fingerprint(specAny)
 	types.NewLink().WriteMap(processed.Tags)
 
 	// Additional labels in the InstanceAccess spec

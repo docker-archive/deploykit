@@ -18,6 +18,8 @@ import (
 )
 
 const (
+	// SpecHash is the label name used to include a hash of the instance.Spec used to provision
+	SpecHash = "infrakit_spec_hash"
 	// InstanceLabel is the label name used for labeling the resource with the name in the collection
 	InstanceLabel = "infrakit_instance"
 	// CollectionLabel is the the label used to label the name of the collection
