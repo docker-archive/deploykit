@@ -119,6 +119,9 @@ func (l *Link) WriteMap(target map[string]string) (merged map[string]string) {
 		merged[k] = v
 	}
 	for k, v := range l.Map() {
+		if v == "" {
+			continue
+		}
 		merged[k] = v
 	}
 	return

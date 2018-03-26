@@ -110,10 +110,13 @@ properties:
     Properties:
       wait1: "@depend('A/ID')@"
       wait2: "@depend('B/ID')@"
+      wait3: "@depend('post-provision:A/data/joinToken')@"
       prop1: C-1
       prop2: C-2
   D:
     plugin: az1/net
+    init: |
+      cluster join --token @depend('post-provision:A/data/joinToken')@ @depend('A/Properties/address')@
     Properties:
       wait1: "@depend('A/ID')@"
       wait2: "@depend('B/ID')@"
@@ -132,24 +135,26 @@ properties:
 
 	// Provisioning order ==> B depends on A, so A must run before B
 	provisionWatch, provisionWatching := processProvisionWatches(properties)
-	require.Equal(t, 3, len(provisionWatch.watchers["A"])) // To provision, 3 depends on A
-	require.Equal(t, 0, len(provisionWatching["A"]))       // A depends on 0
-	require.Equal(t, 2, len(provisionWatch.watchers["B"])) // 2 depends on B
-	require.Equal(t, 1, len(provisionWatching["B"]))       // B depends on 1 (A)
-	require.Equal(t, 1, len(provisionWatch.watchers["C"])) // D
-	require.Equal(t, 2, len(provisionWatching["C"]))       // A and B
-	require.Equal(t, 0, len(provisionWatch.watchers["D"])) // 0 watchers on D
-	require.Equal(t, 3, len(provisionWatching["D"]))       // A, B, C
+	require.Equal(t, 4, len(provisionWatch.watchers["A"]))                // To provision, 4 expressions depends on A
+	require.Equal(t, 0, len(provisionWatching["A"]))                      // A depends on 0
+	require.Equal(t, 2, len(provisionWatch.watchers["post-provision:A"])) // C and D
+	require.Equal(t, 0, len(provisionWatching["post-provision:A"]))       // Technically on A but treat it as distinct
+	require.Equal(t, 2, len(provisionWatch.watchers["B"]))                // 2 depends on B
+	require.Equal(t, 1, len(provisionWatching["B"]))                      // B depends on 1 (A)
+	require.Equal(t, 1, len(provisionWatch.watchers["C"]))                // D
+	require.Equal(t, 3, len(provisionWatching["C"]))                      // A, post-provision:A and B
+	require.Equal(t, 0, len(provisionWatch.watchers["D"]))                // 0 watchers on D
+	require.Equal(t, 5, len(provisionWatching["D"]))                      // A, B, C
 
 	// Destroy order ==> in reverse
 	destroyWatch, destroyWatching := processDestroyWatches(properties)
 	require.Equal(t, 0, len(destroyWatch.watchers["A"])) // 0 waits for A to be destroyed before it can be destroyed.
-	require.Equal(t, 3, len(destroyWatching["A"]))       // 3 references A so A is watching on 3
+	require.Equal(t, 4, len(destroyWatching["A"]))       // 5 references A so A is watching on 5
 	require.Equal(t, 1, len(destroyWatch.watchers["B"])) // A waits on B
 	require.Equal(t, 2, len(destroyWatching["B"]))       // C and D
 	require.Equal(t, 2, len(destroyWatch.watchers["C"])) // A and B
 	require.Equal(t, 1, len(destroyWatching["C"]))       // D
-	require.Equal(t, 3, len(destroyWatch.watchers["D"])) // A, B, C
+	require.Equal(t, 4, len(destroyWatch.watchers["D"])) // A, B, C, and post-provision:A
 	require.Equal(t, 0, len(destroyWatching["D"]))       // 0
 
 }

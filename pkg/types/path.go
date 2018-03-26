@@ -231,6 +231,11 @@ func (p Paths) Sort() {
 	sort.Sort(p)
 }
 
+// Slice returns the slice
+func (p Paths) Slice() []Path {
+	return []Path(p)
+}
+
 // SortPaths sorts the paths
 func SortPaths(p []Path) {
 	sort.Sort(Paths(p))

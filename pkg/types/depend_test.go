@@ -1,6 +1,7 @@
 package types
 
 import (
+	"fmt"
 	"sort"
 	"testing"
 
@@ -11,12 +12,14 @@ import (
 )
 
 func TestParseDepends(t *testing.T) {
-	require.False(t, DependRegex.MatchString("gopher"))
-	require.False(t, DependRegex.MatchString("@depend()"))
-	require.True(t, DependRegex.MatchString("@depend('./bca/xyz/foo')@"))
-	require.True(t, DependRegex.MatchString("@depend('bca/xyz/foo')@"))
-	require.True(t, DependRegex.MatchString("@depend('bca/xyz/foo/field2')@"))
-	require.True(t, DependRegex.MatchString("@depend('bca/xyz/foo/[2]')@"))
+	require.False(t, dependRegex.MatchString("gopher"))
+	require.False(t, dependRegex.MatchString("@depend()"))
+	require.True(t, dependRegex.MatchString("@depend('./bca/xyz/foo')@"))
+	require.True(t, dependRegex.MatchString("@depend('bca/xyz/foo')@"))
+	require.True(t, dependRegex.MatchString("@depend('bca/xyz/foo/field2')@"))
+	require.True(t, dependRegex.MatchString("@depend('bca/xyz/foo/[2]')@"))
+	require.True(t, dependRegex.MatchString("@depend('bca:modifier/xyz/foo/[2]')@"))
+	require.True(t, dependRegex.MatchString("cluster join --token @depend('bca:modifier/xyz/foo/[2]')@ && echo 1"))
 
 	{
 		_, match := Depend("foo").Parse()
@@ -29,9 +32,23 @@ func TestParseDepends(t *testing.T) {
 	{
 		p, match := Depend("@depend('foo/bar/baz')@").Parse()
 		require.True(t, match)
-		require.Equal(t, `foo/bar/baz`, p.String())
+		require.Equal(t, PathsFromStrings(`foo/bar/baz`).Slice(), p)
 	}
-
+	{
+		p, match := Depend("@depend('foo-key/bar/baz')@").Parse()
+		require.True(t, match)
+		require.Equal(t, PathsFromStrings(`foo-key/bar/baz`).Slice(), p)
+	}
+	{
+		p, match := Depend("@depend('foo:modifier/bar/baz')@").Parse()
+		require.True(t, match)
+		require.Equal(t, PathsFromStrings(`foo:modifier/bar/baz`).Slice(), p)
+	}
+	{
+		p, match := Depend("cluster join --token @depend('bca:modifier/xyz/foo/[2]')@ && echo 1").Parse()
+		require.True(t, match)
+		require.Equal(t, PathsFromStrings(`bca:modifier/xyz/foo/[2]`).Slice(), p)
+	}
 	{
 		var v interface{}
 		require.NoError(t, Decode([]byte(`
@@ -115,7 +132,7 @@ field4:
   object_field3 :
     - element1: "@depend('net1/foo/bar/3/1')@"
     - element2: "@depend('net1/foo/bar/3/2')@"
-    - element3: "@depend('net1/foo/bar/3/3')@"
+    - element3: "cluster join --token @depend('net1/foo/bar/3/3')@ --flag @depend('net1/foo/bar/1')@ 10.2.100.101"
     - element4: "@depend('net1/foo/bar/3/4')@"
 field5: "@depend('net1/foo/bar/4')@"
 `), &v))
@@ -141,8 +158,13 @@ field5: "@depend('net1/foo/bar/4')@"
 		require.Equal(t, store[`net1/foo/bar/2`], Get(PathFromString(`field4/object_field2`), vv))
 		require.Equal(t, store[`net1/foo/bar/3/1`], Get(PathFromString(`field4/object_field3/[0]/element1`), vv))
 		require.Equal(t, store[`net1/foo/bar/3/2`], Get(PathFromString(`field4/object_field3/[1]/element2`), vv))
-		require.Equal(t, store[`net1/foo/bar/3/3`], Get(PathFromString(`field4/object_field3/[2]/element3`), vv))
+
+		require.Equal(t,
+			fmt.Sprintf("cluster join --token %v --flag %v 10.2.100.101", store[`net1/foo/bar/3/3`], store[`net1/foo/bar/1`]),
+			Get(PathFromString(`field4/object_field3/[2]/element3`), vv))
+
 		require.Equal(t, store[`net1/foo/bar/3/4`], Get(PathFromString(`field4/object_field3/[3]/element4`), vv))
+
 		require.Equal(t, store[`net1/foo/bar/4`], Get(PathFromString(`field5`), vv))
 
 	}
@@ -177,7 +199,7 @@ field5: "@depend('net1/foo/bar/4')@"
 		vv := EvalDepends(v, fetch)
 		any := AnyValueMust(vv)
 		depends := ParseDepends(any)
-		require.Equal(t, 3, len(depends))
+		require.Equal(t, 3, len(depends)) // the store doesn't have values for 3 keys
 	}
 }
 

@@ -5,35 +5,45 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"strings"
 
 	"github.com/twmb/algoimpl/go/graph"
 )
 
-// DependRegex is the regex for the special format of a string value to denote a dependency
+const dependRegexStr = "\\@depend\\('(([[:alnum:]]|-|_|:|\\.|/|\\[|\\])+)'\\)\\@"
+
+// dependRegex is the regex for the special format of a string value to denote a dependency
 // on another resource's property field.  Eg. "@depends('net1/cidr')@"
-var DependRegex = regexp.MustCompile("\\@depend\\('(([[:alnum:]]|-|_|\\.|/|\\[|\\])+)'\\)\\@")
+var dependRegex = regexp.MustCompile(dependRegexStr)
 
 // Depend is a specification of a dependency
 type Depend string
 
-// NewDepend returns a Depend
-func NewDepend(p string) (Depend, error) {
-	return Depend(fmt.Sprintf("\"@depend('%s')@\"", p)), nil
+// NewDepend returns a Depend for a single expression
+func NewDepend(p string) Depend {
+	return Depend(fmt.Sprintf("\"@depend('%s')@\"", p))
 }
 
 // Parse parses the expression into a path.  If it's not a valid expression, false is returned.
-func (d Depend) Parse() (Path, bool) {
-	matches := DependRegex.FindStringSubmatch(string(d))
-	if len(matches) > 1 {
-		return PathFromString(matches[1]), true
+// TODO - this assumes there's only 1 expression and it's the entire string. This won't work
+// for cases like an Init script where a script like `cluster join --token @depend('a')@ --flag @depend('b')@ 10.1.1.1`
+func (d Depend) Parse() (found []Path, hasMatches bool) {
+	for _, m := range dependRegex.FindAllStringSubmatch(string(d), -1) {
+		found = append(found, PathFromString(m[1]))
 	}
-	return Path{}, false
+	hasMatches = len(found) > 0
+	return
 }
 
 // EvalDepends takes a value that possibly have a number of depend expressions and evaluate
 // all expression within and substitute values from the fetcher.
 func EvalDepends(v interface{}, fetcher func(Path) (interface{}, error)) interface{} {
 	switch v := v.(type) {
+	case *Any:
+		var f interface{}
+		if err := v.Decode(&f); err == nil {
+			return EvalDepends(f, fetcher)
+		}
 	case map[string]interface{}:
 		for k, vv := range v {
 			v[k] = EvalDepends(vv, fetcher)
@@ -43,15 +53,47 @@ func EvalDepends(v interface{}, fetcher func(Path) (interface{}, error)) interfa
 			v[i] = EvalDepends(vv, fetcher)
 		}
 	case string:
-		if p, ok := Depend(v).Parse(); ok {
-			// found a depend, now get the real value and swap
-			newV, err := fetcher(p)
-			if err != nil {
-				return err.Error()
+		if found, ok := Depend(v).Parse(); ok {
+
+			// If there are more than one '@depend@' expression, then we'd assume the field
+			// value is a string, because it doesn't make any sense to "concatenate" two ints or floats.
+			if len(found) == 1 {
+				// found a depend, now get the real value and swap
+				substituted, err := fetcher(found[0])
+				if err != nil {
+					substituted = err.Error()
+				}
+				if substituted == nil {
+					// no value found, just return original expression
+					return fmt.Sprintf("@depend('%s')@", found[0].String())
+				}
+				if _, is := substituted.(string); !is {
+					return substituted // for a string expression that evals to a non-string type
+				}
 			}
-			if newV != nil {
-				return newV
+
+			// Otherwise we assume this is going to be text with 0 or more expressions
+			text := v
+			for _, p := range found {
+
+				// Pretty hacky: since all the paths are tokenized in order as they appear
+				// we simply reconstruct the original expressions and use them as separators to split the text
+				// and perform substitutions from left to right until the end.
+				separator := fmt.Sprintf("@depend('%s')@", p.String())
+
+				// found a depend, now get the real value and swap
+				substituted, err := fetcher(p)
+				if err != nil {
+					substituted = err.Error()
+				}
+				if substituted == nil {
+					substituted = separator // if we don't have value, then use the original expression
+				}
+
+				parts := strings.Split(text, separator)
+				text = strings.Join(append([]string{parts[0], fmt.Sprintf("%v", substituted)}, parts[1:]...), "")
 			}
+			return text
 		}
 	default:
 	}
@@ -82,8 +124,10 @@ func parse(v interface{}, found []Path) (out []Path) {
 			out = append(out, parse(vv, nil)...)
 		}
 	case string:
-		if p, ok := Depend(v).Parse(); ok {
-			out = append(out, p)
+		if found, ok := Depend(v).Parse(); ok {
+			for _, p := range found {
+				out = append(out, p)
+			}
 		}
 	default:
 	}
