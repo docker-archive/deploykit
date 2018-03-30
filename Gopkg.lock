@@ -412,8 +412,8 @@
     "watch",
     "winfile"
   ]
-  revision = "a30252cb686a21eb2d0b98132633053ec2f7f1e5"
-  version = "v1.0.0"
+  revision = "000912af8de2d2b9d184786b4cf4c3542b7884e5"
+  source = "github.com/vsco/tail"
 
 [[projects]]
   name = "github.com/imdario/mergo"
@@ -937,10 +937,10 @@
   version = "v1.2.1"
 
 [[projects]]
-  name = "gopkg.in/fsnotify.v1"
+  name = "gopkg.in/fsnotify/fsnotify.v1"
   packages = ["."]
-  revision = "629574ca2a5df945712d3079857300b5e4da0236"
-  version = "v1.4.2"
+  revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
+  version = "v1.4.7"
 
 [[projects]]
   name = "gopkg.in/inconshreveable/log15.v2"
@@ -993,6 +993,7 @@
   revision = "a5b47d3"
 
 [[projects]]
+  branch = "release-1.7"
   name = "k8s.io/apimachinery"
   packages = [
     "pkg/api/equality",
@@ -1040,7 +1041,7 @@
     "pkg/watch",
     "third_party/forked/golang/reflect"
   ]
-  revision = "release-1.7"
+  revision = "208a6980b14bbb263f29482482eabdbcfff9f7bb"
 
 [[projects]]
   name = "k8s.io/client-go"
@@ -1148,6 +1149,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "0e6b4c24ecfee35b0dd0427d72e47f7eaa4370e616e5a24d1ce01b69e585f080"
+  inputs-digest = "e6a1088c4d3674f4e0395c4775c38d31ab91a8c428aa4cb7038c6b8c5b732ae8"
   solver-name = "gps-cdcl"
   solver-version = 1
