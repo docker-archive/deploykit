@@ -111,6 +111,7 @@ const (
 	unmatched
 	terminating
 	terminated
+	throttled
 
 	// Signals
 	resourceFound fsm.Signal = iota
@@ -122,6 +123,7 @@ const (
 	terminate
 	terminateError
 	cleanup
+	throttle // when it's asked to go back to requested state
 )
 
 // BuildModel constructs a workflow model given the configuration blob provided by user in the Properties
@@ -176,6 +178,7 @@ func BuildModel(properties pool.Properties, options pool.Options) (*Model, error
 			Transitions: map[fsm.Signal]fsm.Index{
 				dependencyMissing: waiting,
 				resourceFound:     ready,
+				throttle:          throttled,
 				provisionError:    cannotProvision,
 			},
 			Actions: map[fsm.Signal]fsm.Action{
@@ -185,6 +188,21 @@ func BuildModel(properties pool.Properties, options pool.Options) (*Model, error
 				},
 				resourceFound: func(n fsm.FSM) error {
 					model.instanceReadyChan <- n
+					return nil
+				},
+			},
+		},
+		fsm.State{
+			Index: throttled,
+			TTL:   fsm.Expiry{fsm.Tick(1), provision},
+			Transitions: map[fsm.Signal]fsm.Index{
+				resourceFound: ready,
+				resourceLost:  provisioning,
+				provision:     provisioning,
+			},
+			Actions: map[fsm.Signal]fsm.Action{
+				provision: func(n fsm.FSM) error {
+					model.instanceProvisionChan <- n
 					return nil
 				},
 			},
@@ -288,6 +306,7 @@ func BuildModel(properties pool.Properties, options pool.Options) (*Model, error
 
 	spec.SetStateNames(map[fsm.Index]string{
 		requested:        "REQUESTED",
+		throttled:        "THROTTLED",
 		ready:            "READY",
 		provisioning:     "PROVISIONING",
 		waiting:          "WAITING_PROVISION",
@@ -300,6 +319,7 @@ func BuildModel(properties pool.Properties, options pool.Options) (*Model, error
 	}).SetSignalNames(map[fsm.Signal]string{
 		resourceFound:     "resource_found",
 		resourceLost:      "resource_lost",
+		throttle:          "throttle",
 		provision:         "provision",
 		terminate:         "terminate",
 		cleanup:           "cleanup",

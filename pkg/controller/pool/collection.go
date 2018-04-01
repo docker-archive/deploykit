@@ -315,6 +315,18 @@ func (c *collection) run(ctx context.Context) {
 
 				item := c.Collection.GetByFSM(f)
 				if item != nil {
+
+					// We throttle provisioning based on the
+					// parallelism parameter and the number of inflight
+					// resources
+					inProvisioning := c.Collection.GetCountByState(provisioning)
+
+					if c.properties.Parallelism < inProvisioning {
+						// we need to send this back to the requested state
+						item.State.Signal(throttle)
+						continue
+					}
+
 					accessor := c.accessor
 					spec, err := c.buildSpec(item, accessor.Spec)
 					if err != nil {

@@ -350,6 +350,17 @@ func (c *Collection) Get(k string) *Item {
 	return c.items[k]
 }
 
+// GetCountByState returns the number of instances in the given state
+func (c *Collection) GetCountByState(state fsm.Index) (count int) {
+	c.Visit(func(i Item) bool {
+		if i.State.State() == state {
+			count++
+		}
+		return true
+	})
+	return
+}
+
 // GetByFSM returns an item by the state machine
 func (c *Collection) GetByFSM(f fsm.FSM) (item *Item) {
 	c.Visit(func(i Item) bool {
