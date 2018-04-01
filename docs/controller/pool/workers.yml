@@ -1,0 +1,24 @@
+{{/* =% text %= */}}
+
+{{ $count := param "count" "int" "Count" | prompt "How many?" "int" 5 }}
+{{ $parallelism := param "parallelism" "int" "Parallelism" | prompt "How many at a time?" "int" 1 }}
+
+kind: pool
+metadata:
+  name: workers
+options:
+  WaitBeforeProvision: 5
+  WaitBeforeDestroy: 5
+properties:
+  plugin: az1/compute
+  count: {{ $count }}   # how many in the pool
+  parallelism: {{ $parallelism }}  # how many to provision / destroy at a time
+  select:
+    az: az1
+    type: compute
+  init: |
+    sudo apt-get install -y docker
+  properties:
+    instanceType: xlarge
+    vcpu: 8
+    mem: 512G

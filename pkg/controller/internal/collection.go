@@ -42,9 +42,10 @@ func (f stateMachine) MarshalJSON() ([]byte, error) {
 
 // Item is an item in the collection.
 type Item struct {
-	Key   string
-	State stateMachine
-	Data  map[string]interface{} `json:",omitempty"`
+	Key     string
+	Ordinal int
+	State   stateMachine
+	Data    map[string]interface{} `json:",omitempty"`
 }
 
 // Collection is a Managed that tracks a set of finite state machines.
