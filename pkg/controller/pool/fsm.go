@@ -112,6 +112,7 @@ const (
 	terminating
 	terminated
 	throttled
+	terminate_throttled
 
 	// Signals
 	resourceFound fsm.Signal = iota
@@ -208,11 +209,26 @@ func BuildModel(properties pool.Properties, options pool.Options) (*Model, error
 			},
 		},
 		fsm.State{
+			Index: terminate_throttled,
+			TTL:   fsm.Expiry{fsm.Tick(1), terminate},
+			Transitions: map[fsm.Signal]fsm.Index{
+				resourceLost: terminated,
+				terminate:    terminating,
+			},
+			Actions: map[fsm.Signal]fsm.Action{
+				terminate: func(n fsm.FSM) error {
+					model.instanceDestroyChan <- n
+					return nil
+				},
+			},
+		},
+		fsm.State{
 			Index: terminating,
 			Transitions: map[fsm.Signal]fsm.Index{
 				dependencyMissing: waitingTerminate,
 				resourceLost:      terminated,
 				terminateError:    cannotTerminate,
+				throttle:          terminate_throttled,
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				dependencyMissing: func(n fsm.FSM) error {
@@ -305,17 +321,18 @@ func BuildModel(properties pool.Properties, options pool.Options) (*Model, error
 	}
 
 	spec.SetStateNames(map[fsm.Index]string{
-		requested:        "REQUESTED",
-		throttled:        "THROTTLED",
-		ready:            "READY",
-		provisioning:     "PROVISIONING",
-		waiting:          "WAITING_PROVISION",
-		waitingTerminate: "WAITING_TERMINATE",
-		cannotProvision:  "CANNOT_PROVISION",
-		cannotTerminate:  "CANNOT_TERMINATE",
-		unmatched:        "UNMATCHED",
-		terminating:      "TERMINATING",
-		terminated:       "TERMINATED",
+		requested:           "REQUESTED",
+		throttled:           "THROTTLED",
+		terminate_throttled: "THROTTLED",
+		ready:               "READY",
+		provisioning:        "PROVISIONING",
+		waiting:             "WAITING_PROVISION",
+		waitingTerminate:    "WAITING_TERMINATE",
+		cannotProvision:     "CANNOT_PROVISION",
+		cannotTerminate:     "CANNOT_TERMINATE",
+		unmatched:           "UNMATCHED",
+		terminating:         "TERMINATING",
+		terminated:          "TERMINATED",
 	}).SetSignalNames(map[fsm.Signal]string{
 		resourceFound:     "resource_found",
 		resourceLost:      "resource_lost",

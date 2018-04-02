@@ -31,15 +31,15 @@ var (
 		},
 		PluginRetryInterval:    types.Duration(1 * time.Second),
 		MinChannelBufferSize:   10,
-		MinWaitBeforeProvision: 5,
+		MinWaitBeforeProvision: 3,
 		ModelProperties:        DefaultModelProperties,
 	}
 
 	// DefaultModelProperties is the default properties for the fsm model
 	DefaultModelProperties = pool.ModelProperties{
 		TickUnit:            types.FromDuration(1 * time.Second),
-		WaitBeforeProvision: fsm.Tick(5),
-		WaitBeforeDestroy:   fsm.Tick(5),
+		WaitBeforeProvision: fsm.Tick(3),
+		WaitBeforeDestroy:   fsm.Tick(3),
 		ChannelBufferSize:   10,
 	}
 
