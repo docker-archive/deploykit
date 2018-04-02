@@ -42,9 +42,10 @@ func (f stateMachine) MarshalJSON() ([]byte, error) {
 
 // Item is an item in the collection.
 type Item struct {
-	Key   string
-	State stateMachine
-	Data  map[string]interface{} `json:",omitempty"`
+	Key     string
+	Ordinal int
+	State   stateMachine
+	Data    map[string]interface{} `json:",omitempty"`
 }
 
 // Collection is a Managed that tracks a set of finite state machines.
@@ -347,6 +348,17 @@ func (c *Collection) GetPrevSpec() (s *types.Spec) {
 // Get returns an item by key. This is unsynchronized so caller / user needs to synchronize as needed.
 func (c *Collection) Get(k string) *Item {
 	return c.items[k]
+}
+
+// GetCountByState returns the number of instances in the given state
+func (c *Collection) GetCountByState(state fsm.Index) (count int) {
+	c.Visit(func(i Item) bool {
+		if i.State.State() == state {
+			count++
+		}
+		return true
+	})
+	return
 }
 
 // GetByFSM returns an item by the state machine

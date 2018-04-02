@@ -50,6 +50,14 @@ func Command(scope scope.Scope) *cobra.Command {
 			name := args[0]
 			source := args[1]
 
+			if strings.Index(source, "://") == -1 {
+				wd, err := os.Getwd()
+				if err != nil {
+					return err
+				}
+				source = "file://" + filepath.Join(wd, source)
+			}
+
 			playbooks, err := playbook.Load()
 			if err != nil {
 				return err
