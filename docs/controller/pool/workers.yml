@@ -9,7 +9,6 @@ metadata:
 options:
   WaitBeforeProvision: 3
   WaitBeforeDestroy: 3
-  ObserveInterval: 0.5s
 properties:
   plugin: az1/compute
   count: {{ $count }}   # how many in the pool
