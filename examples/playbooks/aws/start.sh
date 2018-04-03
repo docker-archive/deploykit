@@ -7,10 +7,10 @@
 
 {{ if $clearState }}
 echo "Clear local state from previous runs"
-rm -rf ~/.infrakit/plugins/* # remove sockets, pid files, etc.
-rm -rf ~/.infrakit/configs/* # for file based manager
+rm -rf $HOME/.infrakit/plugins/* # remove sockets, pid files, etc.
+rm -rf $HOME/.infrakit/configs/* # for file based manager
 # Since we are using file based leader detection, write the default name (manager1) to the leader file.
-echo manager1 > ~/.infrakit/leader
+echo manager1 > $HOME/.infrakit/leader
 {{ end }}
 
 echo "Starting infrakit with aws plugin..."

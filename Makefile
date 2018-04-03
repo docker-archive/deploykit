@@ -210,35 +210,4 @@ ifeq (${DOCKER_TAG_LATEST},true)
 endif
 endif
 
-build-docker: build-installer \
-	build-devbundle \
-	#build-provider-aws \
-	#build-provider-digitalocean \
-	#build-provider-google \
-	#build-provider-terraform \
-
-# Provider: AWS
-build-provider-aws: build/infrakit-instance-aws build/infrakit-metadata-aws
-	@mkdir -p pkg/provider/aws/build
-	@cp build/infrakit-instance-aws pkg/provider/aws/build
-	@cp build/infrakit-metadata-aws pkg/provider/aws/build
-	$(MAKE) -C pkg/provider/aws build-docker
-
-# Provider: Google
-build-provider-google: build/infrakit-instance-gcp
-	@mkdir -p pkg/provider/google/build
-	@cp build/infrakit-instance-gcp pkg/provider/google/build
-	$(MAKE) -C pkg/provider/google build-docker
-
-# Provider: DigitalOcean
-build-provider-digitalocean: build/infrakit-instance-digitalocean
-	@mkdir -p pkg/provider/digitalocean/build
-	@cp build/infrakit-instance-digitalocean pkg/provider/digitalocean/build
-	$(MAKE) -C pkg/provider/digitalocean build-docker
-
-# Provider: Terraform
-build-provider-terraform: build/infrakit-instance-terraform
-	@mkdir -p pkg/provider/terraform/instance/build
-	@cp build/infrakit-instance-terraform pkg/provider/terraform/instance/build
-	@cp build/terraform pkg/provider/terraform/instance/build
-	$(MAKE) -C pkg/provider/terraform/instance build-docker
+build-docker: build-installer build-devbundle

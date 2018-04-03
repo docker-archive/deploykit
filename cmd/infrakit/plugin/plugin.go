@@ -128,16 +128,6 @@ func Command(scope scope.Scope) *cobra.Command {
 			return err
 		}
 
-		defer func() {
-			if r := recover(); r != nil {
-				log.Error("Error occurred. Recovered but exiting.", "err", r)
-				pluginManager.TerminateRunning()
-			}
-			pluginManager.WaitForAllShutdown()
-			log.Info("All plugins shutdown")
-			pluginManager.Stop()
-		}()
-
 		if len(args) == 0 {
 
 			fmt.Println("Plugins available:")
@@ -151,6 +141,16 @@ func Command(scope scope.Scope) *cobra.Command {
 			}
 			return nil
 		}
+
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("Error occurred. Recovered but exiting.", "err", r)
+				pluginManager.TerminateRunning()
+			}
+			pluginManager.WaitForAllShutdown()
+			log.Info("All plugins shutdown")
+			pluginManager.Stop()
+		}()
 
 		// Generate a list of StartPlugin instructions for each arg that isn't seen in discovery
 		for _, arg := range args {

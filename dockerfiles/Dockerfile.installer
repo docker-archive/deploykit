@@ -1,6 +1,6 @@
 FROM golang:1.10.0-alpine3.7
 
-RUN apk add --update git make gcc musl-dev wget ca-certificates openssl libvirt-static libvirt-dev libvirt-lxc libvirt-qemu git openssh file
+RUN apk add --update git make gcc musl-dev wget ca-certificates openssl libvirt-dev libvirt-static libvirt-lxc libvirt-qemu git openssh file
 
 ENV GOPATH /go
 ENV PATH /go/bin:$PATH
