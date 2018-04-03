@@ -3,10 +3,10 @@
 {{ $clearState := flag "clear-state" "bool" "Clear stored states" | prompt "Clear state?" "bool" true }}
 
 {{ if $clearState }}
-rm -rf ~/.infrakit/plugins/* # remove sockets, pid files, etc.
-rm -rf ~/.infrakit/configs/global.config # for file based manager
+rm -rf $HOME/.infrakit/plugins/* # remove sockets, pid files, etc.
+rm -rf $HOME/.infrakit/configs/global.config # for file based manager
 # Since we are using file based leader detection, write the default name (manager1) to the leader file.
-echo manager1 > ~/.infrakit/leader
+echo manager1 > $HOME/.infrakit/leader
 {{ end }}
 
 # The simulators are started up with different names to mimic different resources
