@@ -76,8 +76,10 @@ type Collection struct {
 
 	previous *types.Spec
 
-	items map[string]*Item // read/writes of this will not be synchronized by the lock.
-	stop  chan struct{}
+	items     map[string]*Item // read/writes of this will not be synchronized by the lock.
+	itemsLock sync.RWMutex
+
+	stop chan struct{}
 
 	scope scope.Scope
 
@@ -276,6 +278,9 @@ func (c *Collection) MetadataExport(key func(instance.Description) (string, erro
 // Put puts an item by key - this is unsynchronized so caller / user needs to synchronize the Put
 func (c *Collection) Put(k string, fsm fsm.FSM, spec *fsm.Spec, data map[string]interface{}) *Item {
 
+	c.itemsLock.Lock()
+	defer c.itemsLock.Unlock()
+
 	changed := false
 
 	defer func() {
@@ -347,6 +352,9 @@ func (c *Collection) GetPrevSpec() (s *types.Spec) {
 
 // Get returns an item by key. This is unsynchronized so caller / user needs to synchronize as needed.
 func (c *Collection) Get(k string) *Item {
+	c.itemsLock.RLock()
+	defer c.itemsLock.RUnlock()
+
 	return c.items[k]
 }
 
@@ -376,7 +384,9 @@ func (c *Collection) GetByFSM(f fsm.FSM) (item *Item) {
 
 // Delete an item by key. This is unsychronized.
 func (c *Collection) Delete(k string) {
+	c.itemsLock.Lock()
 	defer func() {
+		c.itemsLock.Unlock()
 		c.events <- &event.Event{
 			Topic:   c.Topic(TopicCollectionGone),
 			Type:    event.Type("CollectionGone"),
@@ -584,6 +594,10 @@ func (c *Collection) Terminate() (object *types.Object, err error) {
 }
 
 func (c *Collection) snapshot() (*types.Any, error) {
+
+	c.itemsLock.RLock()
+	defer c.itemsLock.RUnlock()
+
 	view := []Item{}
 
 	for _, item := range c.items {
@@ -594,8 +608,12 @@ func (c *Collection) snapshot() (*types.Any, error) {
 	return types.AnyValue(view)
 }
 
-// Visit visits the items managed in this collection. This is unsynchronized.
+// Visit visits the items managed in this collection.
 func (c *Collection) Visit(v func(Item) bool) {
+
+	c.itemsLock.RLock()
+	defer c.itemsLock.RUnlock()
+
 	for _, item := range c.items {
 		if !v(*item) {
 			break

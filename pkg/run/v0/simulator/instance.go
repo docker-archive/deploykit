@@ -17,7 +17,8 @@ import (
 var instanceLogger = logutil.New("module", "simulator/instance")
 
 const (
-	debugV = logutil.V(500)
+	debugV  = logutil.V(500)
+	debugV2 = logutil.V(1000)
 )
 
 // NewInstance returns a typed instance plugin
@@ -47,10 +48,10 @@ func NewInstance(pname plugin.Name, name string, options Options) instance.Plugi
 		for {
 			select {
 			case <-delay:
-				log.Info("Delay done. Continue", "name", name, "plugin", pname)
+				instanceLogger.Info("Delay done. Continue", "name", name, "plugin", pname)
 				return
 			case <-time.Tick(1 * time.Second):
-				log.Info("Simulator starting up.", "name", name, "plugin", pname)
+				instanceLogger.Info("Simulator starting up.", "name", name, "plugin", pname)
 			}
 		}
 	}()
@@ -62,7 +63,7 @@ type instanceSimulator struct {
 	plugin    plugin.Name
 	name      string
 	instances store.KV
-	lock      sync.Mutex
+	lock      sync.RWMutex
 	options   Options
 }
 
@@ -75,23 +76,37 @@ func (s *instanceSimulator) Validate(req *types.Any) error {
 // Provision creates a new instance based on the spec.
 func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) {
 	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV, "plugin", s.plugin)
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
 	<-time.After(s.options.ProvisionDelay)
 
 	// simulator feature....
 	control := struct {
-		Cap int
+		Cap   int            `json:"simulator_cap" yaml:"simulator_cap"`
+		Delay types.Duration `json:"simulator_delay" yaml:"simulator_delay"`
 	}{}
 
-	if err := spec.Properties.Decode(&control); err == nil && control.Cap > 0 {
-		if found, err := s.DescribeInstances(spec.Tags, false); err == nil {
+	err := spec.Properties.Decode(&control)
+	if err != nil {
+		instanceLogger.Error("Error decoding simulator parameters", "err", err)
+	} else {
+		instanceLogger.Info("Simulator has control parameters", "control", control)
+		if control.Cap > 0 {
+			found, err := s.describeInstances(map[string]string{}, false)
+			instanceLogger.Debug("cap describe instances", "len", len(found), "err", err)
 			if len(found) >= control.Cap {
+				instanceLogger.Warn("Simulator cap", "cap", control.Cap)
 				return nil, fmt.Errorf("at capacity %v", control.Cap)
 			}
 		}
 	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	if spec.Tags == nil {
+		spec.Tags = map[string]string{}
+	}
+	spec.Tags["simulator"] = s.plugin.String()
 
 	key := fmt.Sprintf("%v", time.Now().UnixNano())
 	description := instance.Description{
@@ -103,6 +118,12 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 	buff, err := types.AnyValueMust(description).MarshalYAML()
 	if err != nil {
 		return nil, err
+	}
+
+	if control.Delay.Duration() > 0 {
+		instanceLogger.Warn("Simulator delay start", "plugin", s.plugin, "duration", control.Delay.Duration())
+		<-time.After(control.Delay.Duration())
+		instanceLogger.Warn("Simulator delay done", "plugin", s.plugin, "duration", control.Delay.Duration())
 	}
 
 	err = s.instances.Write(description.ID, buff)
@@ -171,17 +192,29 @@ func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Conte
 // The properties flag indicates the client is interested in receiving details about each instance.
 func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 	properties bool) ([]instance.Description, error) {
-	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV, "plugin", s.plugin)
+	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV2, "plugin", s.plugin)
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	<-time.After(s.options.DescribeDelay)
+	return s.describeInstances(labels, properties)
+}
+
+func (s *instanceSimulator) describeInstances(labels map[string]string,
+	properties bool) ([]instance.Description, error) {
 
 	matches := []instance.Description{}
 
+	search := map[string]string{
+		"simulator": s.plugin.String(),
+	}
+	for k, v := range labels {
+		search[k] = v
+	}
+
 	err := store.Visit(s.instances,
-		labels,
+		search,
 		func(v interface{}) map[string]string {
 			return v.(instance.Description).Tags
 		},

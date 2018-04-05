@@ -15,3 +15,4 @@ infrakit plugin start manager:mystack vars group pool simulator:az1 \
 	 --log 5 --log-stack --log-debug-V 500 \
 	 --log-debug-match module=controller/pool \
 	 --log-debug-match module=controller/internal \
+	 --log-debug-match module=simulator/instance \

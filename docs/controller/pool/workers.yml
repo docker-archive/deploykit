@@ -1,13 +1,26 @@
 {{/* =% text %= */}}
 
-{{ $count := param "count" "int" "Count" | prompt "How many?" "int" 5 }}
-{{ $parallelism := param "parallelism" "int" "Parallelism" | prompt "How many at a time?" "int" 1 }}
+{{ $count := param "count" "int" "Count" | prompt "How many?" "int" 50 }}
+{{ $parallelism := param "parallelism" "int" "Parallelism" | prompt "How many at a time?" "int" 5 }}
 
 kind: pool
 metadata:
   name: workers
 options:
+
+  # This is how often we sample the infrastructure.  The ticks are all units of this duration.
+  ObserveInterval: 0.5s
+
+  # This is the size of the buffered channel for the finite state machine work queue -- needs to be at least the count.
+  BufferSize: {{ mul $count 10 | add 1024 }} # controls the fsm engine's queue capacity
+
+  # observation's inbound channel capacity -- needs to be at least the same as the number of resource objects.
+  ChannelBufferSize: {{ mul $count 10 | add 1024 }}
+
+  # How long to wait before we start the provision process, in unit of time (ticks)
   WaitBeforeProvision: 3
+
+  # How long to wait before we start the termination / destroy, in unit of time (ticks)
   WaitBeforeDestroy: 3
 properties:
   plugin: az1/compute
@@ -22,3 +35,5 @@ properties:
     instanceType: xlarge
     vcpu: 8
     mem: 512G
+    simulator_cap: 900    # simulator max capacity
+    #simulator_delay: .5s # simulator provision latency
