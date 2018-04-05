@@ -3,8 +3,11 @@ package main
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path"
+
+	_ "net/http/pprof"
 
 	"github.com/docker/infrakit/cmd/infrakit/base"
 	"github.com/docker/infrakit/pkg/cli"
@@ -81,6 +84,15 @@ func main() {
 		Short: program + " command line interface",
 		PersistentPreRunE: func(c *cobra.Command, args []string) error {
 			logutil.Configure(logOptions)
+
+			if logOptions.Level == 5 {
+				// Debug level. Start pprof
+				go func() {
+					log.Info("Starting pprof at localhost:6060")
+					http.ListenAndServe("localhost:6060", nil)
+				}()
+			}
+
 			return nil
 		},
 	}
