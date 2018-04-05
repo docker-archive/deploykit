@@ -76,7 +76,7 @@ type Collection struct {
 
 	previous *types.Spec
 
-	items     map[string]*Item // read/writes of this will not be synchronized by the lock.
+	items     map[string]*Item
 	itemsLock sync.RWMutex
 
 	stop chan struct{}
