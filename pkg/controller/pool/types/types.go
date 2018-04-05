@@ -64,6 +64,9 @@ type ModelProperties struct {
 	WaitBeforeProvision fsm.Tick
 	WaitBeforeDestroy   fsm.Tick
 	ChannelBufferSize   int
+
+	// FSM tuning options
+	fsm.Options `json:",inline" yaml:",inline"`
 }
 
 // Validate validates the input properties
@@ -87,6 +90,12 @@ type Options struct {
 
 	// ModelProperties are the config parameters for the workflow model
 	ModelProperties `json:",inline" yaml:",inline"`
+
+	// ProvisionDeadline is the deadline for synchronously calling the plugin to provision
+	ProvisionDeadline types.Duration
+
+	// DestroyDeadline is the deadline for synchronously calling the plugin to destroy
+	DestroyDeadline types.Duration
 }
 
 // Validate validates the controller's options
@@ -102,6 +111,12 @@ func (p Options) Validate(ctx context.Context) error {
 	}
 	if p.WaitBeforeProvision < p.MinWaitBeforeProvision {
 		return fmt.Errorf("wait before provision can't be less than %v", p.MinWaitBeforeProvision)
+	}
+	if p.ProvisionDeadline.Duration() == 0 {
+		return fmt.Errorf("bad provision deadline: %v", p.ProvisionDeadline)
+	}
+	if p.DestroyDeadline.Duration() == 0 {
+		return fmt.Errorf("bad destroy deadline: %v", p.DestroyDeadline)
 	}
 	return nil
 }

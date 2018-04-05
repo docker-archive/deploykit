@@ -16,6 +16,7 @@ type Model struct {
 	tickSize time.Duration
 
 	resource.Properties
+	resource.Options
 
 	instanceDestroyChan   chan fsm.FSM
 	instanceProvisionChan chan fsm.FSM
@@ -76,7 +77,9 @@ func (m *Model) Start() {
 
 	if m.set == nil {
 		m.clock.Start()
-		m.set = fsm.NewSet(m.spec, m.clock, fsm.DefaultOptions("resource"))
+
+		log.Info("model starting", "options", m.Options.Options)
+		m.set = fsm.NewSet(m.spec, m.clock, m.Options.Options)
 	}
 }
 
@@ -277,6 +280,11 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 			},
 			Actions: map[fsm.Signal]fsm.Action{
 				cleanup: func(n fsm.FSM) error {
+					defer func() {
+						if err := recover(); err != nil {
+							log.Error("Error cleaning up", "err", err)
+						}
+					}()
 					model.cleanupChan <- n
 					return nil
 				},
@@ -294,8 +302,8 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 		provisioning:     "PROVISIONING",
 		waiting:          "WAITING_PROVISION",
 		waitingTerminate: "WAITING_TERMINATE",
-		cannotProvision:  "CANNOT_PROVISION",
-		cannotTerminate:  "CANNOT_TERMINATE",
+		cannotProvision:  "PROVISION_FAILED",
+		cannotTerminate:  "TERMINATE_FAILED",
 		unmatched:        "UNMATCHED",
 		terminating:      "TERMINATING",
 		terminated:       "TERMINATED",

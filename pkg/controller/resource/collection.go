@@ -21,8 +21,10 @@ type collection struct {
 	*internal.Collection
 
 	accessors map[string]*internal.InstanceAccess
-	options   resource.Options
-	model     *Model
+
+	properties resource.Properties
+	options    resource.Options
+	model      *Model
 
 	resources resources
 
@@ -198,6 +200,7 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 
 	c.accessors = accessors
 	c.model = model
+	c.properties = properties
 	c.options = options
 
 	c.provisionWatch = provisionWatch
@@ -399,32 +402,56 @@ func (c *collection) run(ctx context.Context) {
 
 					if dd, is := d.(instance.Description); is {
 
-						log.Info("Destroy", "instanceID", dd.ID, "key", item.Key)
-						err := accessor.Destroy(dd.ID, instance.Termination)
-						log.Debug("destroy", "instanceID", dd.ID, "key", item.Key, "err", err)
+						// terminate asynchronously
+						timer := time.NewTimer(c.options.DestroyDeadline.Duration())
+						done := make(chan struct{})
 
-						if err != nil {
+						go func() {
+							defer func() {
+								e := recover()
+								if e != nil {
+									log.Error("Recovered from error while terminating", "err", e,
+										"accessor", accessor,
+										"instanceID", dd.ID, "item", item)
+								}
 
-							log.Error("Cannot destroy", "err", err)
-							item.State.Signal(terminateError)
+								close(done)
+							}()
 
-							c.EventCh() <- event.Event{
-								Topic:   c.Topic(TopicDestroyErr),
-								Type:    event.Type("DestroyErr"),
-								ID:      c.EventID(item.Key),
-								Message: "destroying resource error",
-							}.Init().WithError(err)
+							log.Info("Destroy", "instanceID", dd.ID, "key", item.Key)
+							err := accessor.Destroy(dd.ID, instance.Termination)
+							log.Debug("destroy", "instanceID", dd.ID, "key", item.Key, "err", err)
 
-						} else {
+							if err != nil {
 
-							c.EventCh() <- event.Event{
-								Topic:   c.Topic(TopicDestroy),
-								Type:    event.Type("Destroy"),
-								ID:      c.EventID(item.Key),
-								Message: "destroying resource",
-							}.Init()
+								log.Error("Cannot destroy", "err", err)
+								item.State.Signal(terminateError)
 
+								c.EventCh() <- event.Event{
+									Topic:   c.Topic(TopicDestroyErr),
+									Type:    event.Type("DestroyErr"),
+									ID:      c.EventID(item.Key),
+									Message: "destroying resource error",
+								}.Init().WithError(err)
+
+							} else {
+
+								c.EventCh() <- event.Event{
+									Topic:   c.Topic(TopicDestroy),
+									Type:    event.Type("Destroy"),
+									ID:      c.EventID(item.Key),
+									Message: "destroying resource",
+								}.Init()
+
+							}
+						}()
+
+						// Wait for the destroy to complete or when deadline is exceeded.
+						select {
+						case <-timer.C:
+						case <-done:
 						}
+						timer.Stop()
 					}
 				}
 
@@ -449,7 +476,10 @@ func (c *collection) run(ctx context.Context) {
 						continue
 					}
 
-					func() {
+					// provision asynchronously
+					timer := time.NewTimer(c.options.ProvisionDeadline.Duration())
+					done := make(chan struct{})
+					go func() {
 						defer func() {
 							e := recover()
 							if e != nil {
@@ -457,6 +487,8 @@ func (c *collection) run(ctx context.Context) {
 									"accessor", accessor,
 									"spec", spec, "item", item)
 							}
+
+							close(done)
 						}()
 						instanceID, err := accessor.Provision(spec)
 						if err != nil {
@@ -489,8 +521,14 @@ func (c *collection) run(ctx context.Context) {
 								Message: "provisioning resource",
 							}.Init().WithDataMust(spec)
 						}
-
 					}()
+
+					// Wait for the provision to complete or when deadline is exceeded.
+					select {
+					case <-timer.C:
+					case <-done:
+					}
+					timer.Stop()
 				}
 
 			case haveAllData, ok := <-provisionDependencyComplete:

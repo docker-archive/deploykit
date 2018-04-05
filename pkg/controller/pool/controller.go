@@ -21,6 +21,21 @@ var (
 	debugV  = logutil.V(500)
 	debugV2 = logutil.V(1000)
 
+	// DefaultModelProperties is the default properties for the fsm model
+	DefaultModelProperties = pool.ModelProperties{
+		TickUnit:            types.FromDuration(1 * time.Second),
+		WaitBeforeProvision: fsm.Tick(3),
+		WaitBeforeDestroy:   fsm.Tick(3),
+		ChannelBufferSize:   4096,
+		Options: fsm.Options{
+			Name:                       "pool",
+			BufferSize:                 4096,
+			IgnoreUndefinedTransitions: true,
+			IgnoreUndefinedSignals:     true,
+			IgnoreUndefinedStates:      true,
+		},
+	}
+
 	// DefaultOptions is the default options of the controller. This can be controlled at starup
 	// and is set once.
 	DefaultOptions = pool.Options{
@@ -30,17 +45,11 @@ var (
 				internal.InstanceLabel)),
 		},
 		PluginRetryInterval:    types.Duration(1 * time.Second),
-		MinChannelBufferSize:   10,
+		MinChannelBufferSize:   1024,
 		MinWaitBeforeProvision: 3,
 		ModelProperties:        DefaultModelProperties,
-	}
-
-	// DefaultModelProperties is the default properties for the fsm model
-	DefaultModelProperties = pool.ModelProperties{
-		TickUnit:            types.FromDuration(1 * time.Second),
-		WaitBeforeProvision: fsm.Tick(3),
-		WaitBeforeDestroy:   fsm.Tick(3),
-		ChannelBufferSize:   10,
+		ProvisionDeadline:      types.Duration(1 * time.Second),
+		DestroyDeadline:        types.Duration(1 * time.Second),
 	}
 
 	// DefaultProperties is the default properties for the controller, this is per collection / commit
