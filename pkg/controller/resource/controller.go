@@ -40,7 +40,8 @@ var (
 	// and is set once.
 	DefaultOptions = resource.Options{
 		InstanceObserver: &internal.InstanceObserver{
-			ObserveInterval: types.Duration(5 * time.Second),
+			CacheDescribeInstances: true,
+			ObserveInterval:        types.Duration(5 * time.Second),
 			KeySelector: template.EscapeString(fmt.Sprintf(`{{.Tags.%s}}`,
 				internal.InstanceLabel)),
 		},

@@ -129,7 +129,7 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 				return err
 			}
 
-			key := types.Path([]string{name, copy.InstanceObserver.Plugin.String()})
+			key := types.Path([]string{name, copy.InstanceObserver.Name.String()})
 			accessors[key.String()] = &copy
 
 			log.Debug("Initialized INCLUDED accessor", "name", name, "key", key,
@@ -156,7 +156,7 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 					return err
 				}
 
-				key := types.Path([]string{name, copy.InstanceObserver.Plugin.String()})
+				key := types.Path([]string{name, copy.InstanceObserver.Name.String()})
 				deleted[key.String()] = &copy
 
 				log.Debug("Initialize DELETED accessor", "name", name, "key", key,

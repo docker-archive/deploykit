@@ -3,6 +3,7 @@ kind: resource
 metadata:
   name: chain
 options:
+  ObserveInterval: 3s
   WaitBeforeProvision: 5
   WaitBeforeDestroy: 5
 properties:
@@ -11,8 +12,6 @@ properties:
     select:
       az: az1
       type: network
-    ObserveInterval: 1s                               # optional - specified here to control polling interval
-    KeySelector: \{\{.Tags.infrakit_instance\}\}      # optional specified here to control key extraction
     properties:
       name: network:az1-net1
       cidr: 10.20.100.0/24

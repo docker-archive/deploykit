@@ -10,8 +10,11 @@ echo manager1 > $HOME/.infrakit/leader
 {{ end }}
 
 # The simulators are started up with different names to mimic different resources
-INFRAKIT_MANAGER_CONTROLLERS=resource \
-infrakit plugin start manager:mystack vars group resource simulator:az1 simulator:az2 time \
-	 --log 5 --log-stack --log-debug-V 500 \
-	 --log-debug-match module=controller/resource \
-	 --log-debug-match module=controller/internal \
+INFRAKIT_MANAGER_CONTROLLERS=resource,pool \
+infrakit plugin start manager:mystack vars group resource pool simulator:az1 simulator:az2 time \
+	 --log 5 --log-stack --log-debug-V 1000 \
+	 --log-debug-match method=DescribeInstances \
+	 --log-debug-match module=simulator/instance \
+
+
+

@@ -147,6 +147,11 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 
 		copy := access
 
+		// merge defaults
+		mergo.Merge(&copy, internal.InstanceAccess{
+			InstanceObserver: options.InstanceObserver,
+		})
+
 		err = c.configureAccessor(spec, name, &copy)
 		if err != nil {
 			return err
@@ -172,6 +177,11 @@ func (c *collection) updateSpec(spec types.Spec, previous *types.Spec) (err erro
 			// we need to have this still.
 
 			copy := access
+
+			// merge defaults
+			mergo.Merge(&copy, internal.InstanceAccess{
+				InstanceObserver: options.InstanceObserver,
+			})
 
 			if err := c.configureAccessor(prev, name, &copy); err != nil {
 				return err

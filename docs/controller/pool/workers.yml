@@ -9,7 +9,7 @@ metadata:
 options:
 
   # This is how often we sample the infrastructure.  The ticks are all units of this duration.
-  ObserveInterval: 0.5s
+  ObserveInterval: 2s
 
   # This is the size of the buffered channel for the finite state machine work queue -- needs to be at least the count.
   BufferSize: {{ mul $count 10 | add 1024 }} # controls the fsm engine's queue capacity
@@ -35,5 +35,5 @@ properties:
     instanceType: xlarge
     vcpu: 8
     mem: 512G
-    simulator_cap: 900    # simulator max capacity
-    #simulator_delay: .5s # simulator provision latency
+    simulator_cap: 1000    # simulator max capacity
+    simulator_delay: 1s # simulator provision latency
