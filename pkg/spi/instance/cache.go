@@ -36,7 +36,7 @@ func (c *cache) get(key string) (entry, bool) {
 	return v, has
 }
 
-// CacheDescribeIntances returns a Plugin that caches the result
+// CacheDescribeInstances returns a Plugin that caches the result
 // of describe instances.
 func CacheDescribeInstances(p Plugin, ttl time.Duration, now func() time.Time) Plugin {
 	return &cached{
@@ -116,11 +116,10 @@ func (c *cached) DescribeInstances(labels map[string]string, properties bool) ([
 				c.cache.put(key, en)
 
 				return desc, nil
-			} else {
-				// just remove cache entry and try later
-				c.cache.delete(key)
-				return nil, err
 			}
+			// just remove cache entry and try later
+			c.cache.delete(key)
+			return nil, err
 		}
 
 		return cv.value, nil
