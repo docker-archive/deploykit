@@ -48,6 +48,14 @@ type Item struct {
 	Data    map[string]interface{} `json:",omitempty"`
 }
 
+// Error associates an error
+func (i *Item) Error(err error) {
+	if i.Data == nil {
+		i.Data = map[string]interface{}{}
+	}
+	i.Data["error"] = err.Error()
+}
+
 // Collection is a Managed that tracks a set of finite state machines.
 type Collection struct {
 

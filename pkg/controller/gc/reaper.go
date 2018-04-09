@@ -134,12 +134,12 @@ func (r *reaper) updateSpec(spec types.Spec, prev *types.Spec) error {
 
 	r.instances = instance_plugin.LazyConnect(
 		func() (instance.Plugin, error) {
-			return r.scope.Instance(r.instanceObserver.Plugin.String())
+			return r.scope.Instance(r.instanceObserver.Name.String())
 		},
 		r.options.PluginRetryInterval.Duration())
 	r.nodes = instance_plugin.LazyConnect(
 		func() (instance.Plugin, error) {
-			return r.scope.Instance(r.nodeObserver.Plugin.String())
+			return r.scope.Instance(r.nodeObserver.Name.String())
 		},
 		r.options.PluginRetryInterval.Duration())
 

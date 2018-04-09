@@ -18,15 +18,19 @@ import (
 // for a list of instance descriptions at some specified polling interval.
 // Not thread safe.
 type InstanceObserver struct {
+	instance.Plugin
 
-	// Plugin is the name of the instance plugin
-	Plugin plugin.Name
+	// Name is the name of the instance plugin
+	Name plugin.Name `json:"plugin" yaml:"plugin"`
 
 	// Select are the labels to use when querying for instances. This is the namespace.
 	Select map[string]string
 
 	// ObserveInterval is the polling interval for making an observation
 	ObserveInterval types.Duration
+
+	// CacheDescribeInstances is true to turn on caching with ttl equal to the ObserveInterval
+	CacheDescribeInstances bool
 
 	// KeySelector is a string template for selecting the join key from
 	// an instance's instance.Description. This selector template should use escapes
@@ -66,7 +70,7 @@ func (o *InstanceObserver) Validate(defaults *InstanceObserver) error {
 		}
 	}
 	// critical checks
-	if o.Plugin.Zero() {
+	if o.Name.Zero() {
 		return fmt.Errorf("missing plugin name")
 	}
 
@@ -78,6 +82,39 @@ func (o *InstanceObserver) Validate(defaults *InstanceObserver) error {
 		return fmt.Errorf("key selector not specified")
 	}
 	return nil
+}
+
+var (
+	global     = map[plugin.Name]instance.Plugin{}
+	globalLock sync.RWMutex
+)
+
+func cachedPlugin(scope scope.Scope, name plugin.Name, ttl, retry time.Duration) instance.Plugin {
+	p := func() instance.Plugin {
+		globalLock.RLock()
+		defer globalLock.RUnlock()
+		return global[name]
+	}()
+
+	if p == nil {
+
+		instancePlugin := instance_plugin.LazyConnect(
+			func() (instance.Plugin, error) {
+				return scope.Instance(name.String())
+			},
+			retry)
+
+		p = instance.CacheDescribeInstances(instancePlugin, ttl, time.Now)
+
+		globalLock.Lock()
+		global[name] = p
+		globalLock.Unlock()
+
+		log.Info("Allocated cached plugin", "key", name, "plugin", p)
+		return p
+	}
+	log.Info("Using cached plugin", "key", name, "plugin", p)
+	return p
 }
 
 // Init initializes the observer so that it can be started
@@ -92,14 +129,54 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 
 	o.extractKey = KeyExtractor(o.KeySelector)
 
-	instancePlugin := instance_plugin.LazyConnect(
-		func() (instance.Plugin, error) {
-			return scope.Instance(o.Plugin.String())
-		},
-		retry)
+	// add caching layer
+	if o.CacheDescribeInstances {
+		o.Plugin = cachedPlugin(scope, o.Name, o.ObserveInterval.Duration(), retry)
+	} else {
+		o.Plugin = instance_plugin.LazyConnect(
+			func() (instance.Plugin, error) {
+				return scope.Instance(o.Name.String())
+			},
+			retry)
+	}
 
 	o.observe = func() ([]instance.Description, error) {
-		return instancePlugin.DescribeInstances(o.Select, true)
+
+		// Because we are using caching, we want to cache the result set
+		// where the individual instance name isn't part of the query.
+		// This way, we can cache the entire result set and just reuse it
+		// after doing filtering in-memory here.
+		query := map[string]string{}
+		instanceKey := ""
+		if inst, has := o.Select[InstanceLabel]; has {
+			instanceKey = inst
+			for k, v := range o.Select {
+				query[k] = v
+			}
+			delete(query, InstanceLabel) // don't query with the instance label
+		} else {
+			query = o.Select
+		}
+
+		desc, err := o.Plugin.DescribeInstances(query, true)
+		if err != nil {
+			return nil, err
+		}
+
+		// Because the result can be cached and a full set of instances,
+		// we need to filter here to ensure the correct value
+		found := []instance.Description{}
+		if instanceKey != "" {
+			for _, d := range desc {
+				if v, has := d.Tags[InstanceLabel]; has && v == instanceKey {
+					found = append(found, d)
+				}
+			}
+		} else {
+			found = desc
+		}
+
+		return found, err
 	}
 
 	o.observations = make(chan []instance.Description, 10)
@@ -125,7 +202,6 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 			}
 
 			log.Debug("polling", "V", debugV2,
-				"freed", o.paused,
 				"plugin", o.Plugin,
 				"select", o.Select,
 				"observed", len(instances))
@@ -152,6 +228,7 @@ func (o *InstanceObserver) Init(scope scope.Scope, retry time.Duration) error {
 			close(o.observations)
 			log.Debug("observer poller stopped", "V", debugV2)
 		})
+
 	return nil
 }
 

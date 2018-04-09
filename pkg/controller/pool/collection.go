@@ -316,6 +316,7 @@ func (c *collection) run(ctx context.Context) {
 
 								log.Error("Cannot destroy", "err", err)
 								item.State.Signal(terminateError)
+								item.Error(err)
 
 								c.EventCh() <- event.Event{
 									Topic:   c.Topic(TopicDestroyErr),
@@ -397,6 +398,7 @@ func (c *collection) run(ctx context.Context) {
 
 							log.Error("Cannot provision", "err", err)
 							item.State.Signal(provisionError)
+							item.Error(err)
 
 							c.EventCh() <- event.Event{
 								Topic:   c.Topic(TopicProvisionErr),

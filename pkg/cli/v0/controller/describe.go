@@ -22,7 +22,8 @@ func Describe(name string, services *cli.Services) *cobra.Command {
 
 	tags := describe.Flags().StringSlice("tags", []string{}, "Tags to filter")
 	objectsOnly := describe.Flags().BoolP("objects", "o", false, "True to show objects only")
-	view := describe.Flags().StringP("view", "v", "{{.instance.ID}}", "View template for collection object states")
+	view := describe.Flags().StringP("view", "v",
+		"{{ default .instance.ID .error }}", "View template for collection object states")
 
 	describe.RunE = func(cmd *cobra.Command, args []string) error {
 

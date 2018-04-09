@@ -34,17 +34,17 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	return depends.Runnables{
 		depends.AsRunnable(
 			types.Spec{
-				Kind: properties.InstanceObserver.Plugin.Lookup(),
+				Kind: properties.InstanceObserver.Name.Lookup(),
 				Metadata: types.Metadata{
-					Name: properties.InstanceObserver.Plugin.String(),
+					Name: properties.InstanceObserver.Name.String(),
 				},
 			},
 		),
 		depends.AsRunnable(
 			types.Spec{
-				Kind: properties.NodeObserver.Plugin.Lookup(),
+				Kind: properties.NodeObserver.Name.Lookup(),
 				Metadata: types.Metadata{
-					Name: properties.NodeObserver.Plugin.String(),
+					Name: properties.NodeObserver.Name.String(),
 				},
 			},
 		),

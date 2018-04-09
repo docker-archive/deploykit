@@ -37,9 +37,9 @@ func ResolveDependencies(spec types.Spec) (depends.Runnables, error) {
 	dep := depends.Runnables{}
 	dep = append(dep, depends.AsRunnable(
 		types.Spec{
-			Kind: properties.InstanceObserver.Plugin.Lookup(),
+			Kind: properties.InstanceObserver.Name.Lookup(),
 			Metadata: types.Metadata{
-				Name: properties.InstanceObserver.Plugin.String(),
+				Name: properties.InstanceObserver.Name.String(),
 			},
 		},
 	))

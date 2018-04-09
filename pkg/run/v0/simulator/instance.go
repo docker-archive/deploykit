@@ -75,7 +75,8 @@ func (s *instanceSimulator) Validate(req *types.Any) error {
 
 // Provision creates a new instance based on the spec.
 func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) {
-	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV, "plugin", s.plugin)
+	instanceLogger.Debug("Provision", "name", s.name, "spec", spec, "V", debugV, "plugin", s.plugin,
+		"method", "Provision")
 
 	<-time.After(s.options.ProvisionDelay)
 
@@ -133,7 +134,9 @@ func (s *instanceSimulator) Provision(spec instance.Spec) (*instance.ID, error) 
 
 // Label labels the instance
 func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) error {
-	instanceLogger.Debug("Label", "name", s.name, "instance", key, "labels", labels, "V", debugV, "plugin", s.plugin)
+	instanceLogger.Debug("Label", "name", s.name, "instance", key, "labels", labels,
+		"V", debugV, "plugin", s.plugin,
+		"method", "Label")
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -173,7 +176,9 @@ func (s *instanceSimulator) Label(key instance.ID, labels map[string]string) err
 
 // Destroy terminates an existing instance.
 func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Context) error {
-	instanceLogger.Debug("Destroy", "name", s.name, "instance", instance, "context", context, "V", debugV, "plugin", s.plugin)
+	instanceLogger.Debug("Destroy", "name", s.name, "instance", instance, "context", context,
+		"V", debugV, "plugin", s.plugin,
+		"method", "Destroy")
 
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -192,7 +197,9 @@ func (s *instanceSimulator) Destroy(instance instance.ID, context instance.Conte
 // The properties flag indicates the client is interested in receiving details about each instance.
 func (s *instanceSimulator) DescribeInstances(labels map[string]string,
 	properties bool) ([]instance.Description, error) {
-	instanceLogger.Debug("DescribeInstances", "name", s.name, "labels", labels, "V", debugV2, "plugin", s.plugin)
+	instanceLogger.Debug("DescribeInstances",
+		"name", s.name, "labels", labels, "V", debugV2, "plugin", s.plugin,
+		"method", "DescribeInstances")
 
 	s.lock.RLock()
 	defer s.lock.RUnlock()
