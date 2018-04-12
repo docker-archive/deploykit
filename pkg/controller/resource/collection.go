@@ -474,7 +474,7 @@ func (c *collection) run(ctx context.Context) {
 				if item != nil {
 					accessor := c.accessors[item.Key]
 
-					spec, err := c.populateDependencies(item.Key, accessor.Spec)
+					spec, err := c.populateDependencies(item, accessor.Spec)
 					if err != nil {
 
 						log.Error("Dependency missing",
@@ -824,10 +824,17 @@ func processDestroyWatches(properties resource.Properties) (watch *Watch, watchi
 // Assumption: the spec.Properties is fully rendered.  We can take the spec.Properties and
 // generate a list of dependencies via depends().  Now we are rendering this spec.Properties
 // into the final form with all the dependencies substituted.
-func (c *collection) populateDependencies(resourceName string, spec instance.Spec) (instance.Spec, error) {
+func (c *collection) populateDependencies(item *internal.Item, spec instance.Spec) (instance.Spec, error) {
+
+	resourceName := item.Key
 
 	// Turn the spec into a blob and use that to parse the dependencies
-	specAny, err := types.AnyValue(spec)
+	any, err := types.AnyValue(spec)
+	if err != nil {
+		return spec, err
+	}
+
+	specAny, err := c.Render(any, *item)
 	if err != nil {
 		return spec, err
 	}

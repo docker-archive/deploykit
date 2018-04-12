@@ -255,6 +255,11 @@ func BuildModel(properties resource.Properties, options resource.Options) (*Mode
 		},
 		fsm.State{
 			Index: cannotProvision,
+			Transitions: map[fsm.Signal]fsm.Index{
+				// we may have timeout on the synchronous call to provision,
+				// but later on we observe the instance actually being created.
+				resourceFound: ready,
+			},
 		},
 		fsm.State{
 			Index: cannotTerminate,

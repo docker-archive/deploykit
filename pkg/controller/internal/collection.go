@@ -14,6 +14,7 @@ import (
 	"github.com/docker/infrakit/pkg/spi/event"
 	"github.com/docker/infrakit/pkg/spi/instance"
 	"github.com/docker/infrakit/pkg/spi/metadata"
+	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
 )
 
@@ -155,6 +156,22 @@ func NewCollection(scope scope.Scope, topics ...types.Path) (*Collection, error)
 	}
 	c.metadata = metadata_plugin.NewPluginFromChannel(c.metadataUpdates)
 	return c, nil
+}
+
+// Render renders the template in any using the receiver as context
+func (c *Collection) Render(any *types.Any, item Item) (*types.Any, error) {
+	// Run the spec as a template and evaluate it.  So for any escaped {{}} sequences
+	// we can process things
+	unescaped := string(template.Unescape(any.Bytes()))
+	templateEngine, err := c.scope.TemplateEngine("str://"+unescaped, template.Options{})
+	if err != nil {
+		return nil, err
+	}
+	rendered, err := templateEngine.Render(item)
+	if err != nil {
+		return nil, err
+	}
+	return types.AnyString(rendered), nil
 }
 
 // Metadata returns a metadata plugin implementation. Optional; ok to be nil
