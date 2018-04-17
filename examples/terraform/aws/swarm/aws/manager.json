@@ -1,0 +1,89 @@
+{{/*
+
+Instance plugin config for managers on AWS
+
+*/}}
+{
+    {{ if gt (metadata `group/vars/spot/price` | default 0.) 0. }}
+    "Plugin": "aws/ec2-spot-instance",
+    {{ else }}
+    "Plugin": "aws/ec2-instance",
+    {{ end }}
+    "Properties": {
+        "Tags": {
+            "infrakit.clusterName": "{{ var `/cluster/name` }}",
+            "infrakit.role" : "managers",
+            "Name": "{{ var `/cluster/name` }}-manager"
+        },
+        {{ if gt (metadata `group/vars/spot/price` | default 0.) 0. }}
+        "RequestSpotInstancesInput":{
+          "LaunchSpecification": {
+            "IamInstanceProfile": {
+                "Arn": "{{ (var `/local/iam`).InstanceProfileArn }}",
+                "Name": null
+            },
+            "ImageId": "{{ var `/local/amiID` }}",
+            "InstanceType": "{{ var `/local/instanceType` }}",
+            "KeyName": "{{ var `/local/keyName` }}",
+            "NetworkInterfaces": [
+                {
+                    "AssociatePublicIpAddress": true,
+                    "DeleteOnTermination": true,
+                    "DeviceIndex": 0,
+                    "Groups": [
+                        "{{ var `/local/securityGroupIDs` }}"
+                    ],
+                    "NetworkInterfaceId": null,
+                    "PrivateIpAddress": null,  {{/* will be set by plugin if logical id is known */}}
+                    "PrivateIpAddresses": null,
+                    "SecondaryPrivateIpAddressCount": null,
+                    "SubnetId": "{{ var `/local/subnetID` }}"
+                }
+            ],
+            "Placement": {
+              "AvailabilityZone": "{{ var `/local/availabilityZone` }}"
+            }
+          },
+          "SpotPrice":"{{ metadata `vars/spot/price` }}",
+          "Type":"one-time"
+        }
+	{{ else }}
+        "RunInstancesInput": {
+            "BlockDeviceMappings": null,
+            "EbsOptimized": null,
+            "IamInstanceProfile": {
+                "Arn": "{{ (var `/local/iam`).InstanceProfileArn }}",
+                "Name": null
+            },
+            "ImageId": "{{ var `/local/amiID` }}",
+            "InstanceType": "{{ var `/local/instanceType` }}",
+            "KeyName": "{{ var `/local/keyName` }}",
+            "NetworkInterfaces": [
+                {
+                    "AssociatePublicIpAddress": true,
+                    "DeleteOnTermination": true,
+                    "DeviceIndex": 0,
+                    "Groups": [
+                        "{{ var `/local/securityGroupIDs` }}"
+                    ],
+                    "NetworkInterfaceId": null,
+                    "PrivateIpAddress": null,  {{/* will be set by plugin if logical id is known */}}
+                    "PrivateIpAddresses": null,
+                    "SecondaryPrivateIpAddressCount": null,
+                    "SubnetId": "{{ var `/local/subnetID` }}"
+                }
+            ],
+            "Placement": {
+                "AvailabilityZone": "{{ var `/local/availabilityZone` }}",
+                "Tenancy": null
+            },
+            "PrivateIpAddress": null,
+            "RamdiskId": null,
+            "SecurityGroupIds": null,
+            "SecurityGroups": null,
+            "SubnetId": null,
+            "UserData": null
+        }
+	{{ end }}
+    }
+}

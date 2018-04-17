@@ -1,0 +1,16 @@
+{{/*
+
+Instance plugin config for workers on simulator
+
+*/}}
+{
+    "Plugin": "simulator/compute",
+    "Properties": {
+        "Tags": {
+            "infrakit.clusterName": "{{ var `/cluster/name` }}",
+            "infrakit.role" : "workers",
+            "Name": "{{ var `/cluster/name` }}-worker"
+        },
+        "Type" : "simulator-small"
+    }
+}

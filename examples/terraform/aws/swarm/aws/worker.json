@@ -1,0 +1,87 @@
+{{/*
+
+Config for workers on AWS
+
+*/}}
+{
+    {{/* If we specify the spot price, then use spot instead */}}
+    {{ if gt (metadata `group/vars/spot/price` | default 0.) 0. }}
+    "Plugin": "aws/ec2-spot-instance",
+    {{ else }}
+    "Plugin": "aws/ec2-instance",
+    {{ end }}
+    "Properties": {
+        "Tags": {
+            "infrakit.clusterName": "{{ var `/cluster/name` }}",
+            "infrakit.role" : "workers",
+            "Name": "{{ var `/cluster/name` }}-worker"
+        },
+        {{/* If we specify the spot price, then use spot instead */}}
+        {{ if gt (metadata `group/vars/spot/price` | default 0.) 0. }}
+        "RequestSpotInstancesInput":{
+          "LaunchSpecification": {
+            "ImageId": "{{ var `/local/amiID` }}",
+            "InstanceType": "{{ var `/local/instanceType` }}",
+            "KeyName": "{{ var `/local/keyName` }}",
+            "NetworkInterfaces": [
+                {
+                    "AssociatePublicIpAddress": true,
+                    "DeleteOnTermination": true,
+                    "DeviceIndex": 0,
+                    "Groups": [
+                        "{{ var `/local/securityGroupIDs` }}"
+                    ],
+                    "NetworkInterfaceId": null,
+                    "PrivateIpAddress": null,
+                    "PrivateIpAddresses": null,
+                    "SecondaryPrivateIpAddressCount": null,
+                    "SubnetId": "{{ var `/local/subnetID` }}"
+                }
+            ],
+            "Placement": {
+              "AvailabilityZone": "{{ var `/local/availabilityZone` }}"
+            }
+          },
+          "SpotPrice":"{{ metadata `vars/spot/price` }}",
+          "Type":"one-time"
+        }
+        {{ else }}
+        "RunInstancesInput": {
+            "BlockDeviceMappings": null,
+            "DisableApiTermination": null,
+            "EbsOptimized": null,
+            "IamInstanceProfile": null,
+            "ImageId": "{{ var `/local/amiID` }}",
+            "InstanceInitiatedShutdownBehavior": null,
+            "InstanceType": "{{ var `/local/instanceType` }}",
+            "KeyName": "{{ var `/local/keyName` }}",
+            "NetworkInterfaces": [
+                {
+                    "AssociatePublicIpAddress": true,
+                    "DeleteOnTermination": true,
+                    "DeviceIndex": 0,
+                    "Groups": [
+                        "{{ var `/local/securityGroupIDs` }}"
+                    ],
+                    "NetworkInterfaceId": null,
+                    "PrivateIpAddress": null,
+                    "PrivateIpAddresses": null,
+                    "SecondaryPrivateIpAddressCount": null,
+                    "SubnetId": "{{ var `/local/subnetID` }}"
+                }
+            ],
+            "Placement": {
+                "Affinity": null,
+                "AvailabilityZone": "{{ var `/local/availabilityZone` }}",
+                "Tenancy": null
+            },
+            "PrivateIpAddress": null,
+            "RamdiskId": null,
+            "SecurityGroupIds": null,
+            "SecurityGroups": null,
+            "SubnetId": null,
+            "UserData": null
+        }
+        {{ end }}
+    }
+}

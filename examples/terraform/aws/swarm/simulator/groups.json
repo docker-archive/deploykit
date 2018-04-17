@@ -1,0 +1,12 @@
+{{/*
+
+AWS specific - This is where we introspect the environment and export the values to other templates.
+
+*/}}
+{{ source "../common.ikt" }}
+
+
+{
+    "Managers" : {{ include "manager.json" }},
+    "Workers"  : {{ include "worker.json" }}
+}

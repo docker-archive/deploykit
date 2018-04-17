@@ -1,0 +1,459 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "InfraKit Demo - builds a new VPC with a Docker Swarm",
+
+    "Parameters": {
+        "InfrakitConfigRoot" : {
+            "Type" : "String",
+            "Description" : "Root URL of the bootscript",
+            "Default" : "https://raw.githubusercontent.com/chungers/examples/demo/latest/swarm"
+        },
+        "Infrakit" : {
+            "Type" : "String",
+            "Description" : "Docker image of Infrakit",
+            "Default" : "infrakit/devbundle:dev"
+        },
+        "PreinstalledDockerAMI": {
+            "Description": "Pick which AMI to use; yes for preinstalled Docker; no to install the latest from get.docker.com",
+            "Type": "String",
+            "AllowedValues" : [ "yes","no" ],
+            "Default": "yes"
+        },
+        "ClusterSize": {
+            "Description": "Size of the cluster",
+            "Type": "Number",
+            "MinValue": "3",
+            "MaxValue": "10"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "MinLength": "1",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        },
+        "InstanceType" : {
+            "Type" : "String",
+            "Description" : "EC2 HVM instance type (t2.micro, m3.medium, etc).",
+            "AllowedValues" : [ "t2.micro","t2.small","t2.medium" ],
+            "ConstraintDescription" : "Must be a valid EC2 HVM instance type.",
+            "Default" : "t2.micro"
+        },
+        "BootstrapNodePrivateIP" : {
+            "Type" : "String",
+            "Description" : "Private IP of the bootstrap node",
+            "Default" : "172.31.16.101"
+        },
+        "MetadataExportTemplate" : {
+            "Type" : "String",
+            "Description" : "URL to configure the metadata plugin",
+            "Default" : "https://infrakit.github.io/examples/latest/metadata/aws/export.ikt"
+        }
+    },
+
+    "Metadata" : {
+        "AWS::CloudFormation::Interface" : {
+            "ParameterGroups" : [
+                {
+                    "Label" : { "default":"Cluster Properties" },
+                    "Parameters" : [ "InstanceType", "KeyName", "ClusterSize" ]
+                }
+            ],
+            "ParameterLabels" : {
+                "InstanceType" : { "default" : "Agent worker instance type?" },
+                "KeyName" : { "default" : "Which SSH key to use?" },
+                "ClusterSize" : { "default" : "How many nodes in the cluster?" }
+            }
+        }
+    },
+
+    "Mappings": {
+
+        "VpcCidrs" : {
+            "vpc" : {
+                "cidr": "172.31.0.0/16"
+            },
+            "subnet1" : {
+                "cidr": "172.31.16.0/20"
+            }
+        },
+
+        "AWSInstanceType2Arch": {
+            "t2.micro": {
+                "Arch": "HVM64"
+            },
+            "t2.small": {
+                "Arch": "HVM64"
+            },
+            "t2.medium": {
+                "Arch": "HVM64"
+            }
+        },
+
+        "AWSRegionArch2AMIUbuntu1604NoDocker": {
+            "eu-central-1": {
+                "HVM64": "ami-3f1bd150",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-east-1": {
+                "HVM64": "ami-f4cc1de2",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-west-1": {
+                "HVM64": "ami-16efb076",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-west-2": {
+                "HVM64": "ami-a58d0dc5",
+                "HVMG2": "NOT_SUPPORTED"
+            }
+        },
+
+        "AWSRegionArch2AMI": {
+            "eu-central-1": {
+                "HVM64": "ami-aab96cc5",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-east-1": {
+                "HVM64": "ami-d8b569ce",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-west-1": {
+                "HVM64": "ami-71411f11",
+                "HVMG2": "NOT_SUPPORTED"
+            },
+            "us-west-2": {
+                "HVM64": "ami-c877f4a8",
+                "HVMG2": "NOT_SUPPORTED"
+            }
+        },
+
+        "AMISelector" : {
+            "no" : {
+                "hasDocker" : "no",
+                "ami" : "AWSRegionArch2AMIUbuntu1604NoDocker",
+                "userdata" : "wget -qO- https://get.docker.com/ | sh \n"
+            },
+            "yes" : {
+                "hasDocker" : "yes",
+                "ami" : "AWSRegionArch2AMI",
+                "userdata" : "# Docker pre-installed \n"
+            }
+        }
+    },
+
+    "Resources": {
+
+        "Vpc" : {
+            "Type" : "AWS::EC2::VPC",
+            "Properties" : {
+                "CidrBlock" : { "Fn::FindInMap" : [ "VpcCidrs", "vpc", "cidr" ] },
+                "EnableDnsSupport" : "true",
+                "EnableDnsHostnames" : "true",
+                "Tags": [
+                    { "Key" : "Name", "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "VPC"] ] } }
+                ]
+            }
+        },
+
+        "Subnet1" : {
+            "DependsOn" : "Vpc",
+            "Type" : "AWS::EC2::Subnet",
+            "Properties" : {
+                "VpcId" : { "Ref" : "Vpc" },
+                "CidrBlock" : { "Fn::FindInMap" : [ "VpcCidrs", "subnet1", "cidr" ] },
+                "AvailabilityZone" : { "Fn::Select" : [ "0", { "Fn::GetAZs" : { "Ref" : "AWS::Region" } } ] },
+                "Tags": [
+                    { "Key" : "Name", "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "Subnet1"] ] } }
+                ]
+            }
+        },
+
+        "InternetGateway" : {
+            "DependsOn" : "Vpc",
+            "Type" : "AWS::EC2::InternetGateway",
+            "Properties" : {
+                "Tags": [
+                    { "Key" : "Name", "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "IGW"] ] } }
+                ]
+            }
+        },
+
+        "AttachGateway" : {
+            "DependsOn" : ["Vpc", "InternetGateway"],
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "Properties" : {
+                "VpcId" : { "Ref" : "Vpc" },
+                "InternetGatewayId" : { "Ref" : "InternetGateway" }
+            }
+        },
+
+        "RouteViaIgw" : {
+            "DependsOn" : "Vpc",
+            "Type" : "AWS::EC2::RouteTable",
+            "Properties" : {
+                "VpcId" : { "Ref" : "Vpc"},
+                "Tags": [
+                    { "Key" : "Name", "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "RT"] ] } }
+                ]
+            }
+        },
+
+        "PublicRouteViaIgw" : {
+            "DependsOn": ["AttachGateway", "RouteViaIgw"],
+            "Type" : "AWS::EC2::Route",
+            "Properties" : {
+                "RouteTableId" : { "Ref" : "RouteViaIgw" },
+                "DestinationCidrBlock" : "0.0.0.0/0",
+                "GatewayId" : { "Ref" : "InternetGateway" }
+            }
+        },
+
+        "Subnet1RouteTableAssociation" : {
+            "DependsOn": ["Subnet1", "RouteViaIgw"],
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+                "SubnetId" : { "Ref" : "Subnet1" },
+                "RouteTableId" : { "Ref" : "RouteViaIgw" }
+            }
+        },
+
+        "SecurityGroup": {
+            "DependsOn": "InternetGateway",
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "VPC-wide security group",
+                "VpcId": {
+                    "Ref": "Vpc"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "-1",
+                        "FromPort": "0",
+                        "ToPort": "65535",
+                        "CidrIp": { "Fn::FindInMap" : [ "VpcCidrs", "vpc", "cidr" ] }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "24864",
+                        "ToPort": "24864",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ]
+            }
+        },
+
+        "ProvisionerRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version" : "2012-10-17",
+                    "Statement": [ {
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": [ "ec2.amazonaws.com" ]
+                        },
+                        "Action": [ "sts:AssumeRole" ]
+                    } ]
+                },
+                "Path": "/"
+            }
+        },
+
+        "ProvisionerPolicies": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "managers-policy",
+                "PolicyDocument": {
+                    "Version" : "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "*",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [ {
+                    "Ref": "ProvisionerRole"
+                } ]
+            }
+        },
+
+        "InstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [ {
+                    "Ref": "ProvisionerRole"
+                } ]
+            }
+        },
+
+        "Volume1" : {
+            "Type":"AWS::EC2::Volume",
+            "Properties" : {
+                "AvailabilityZone" :  { "Fn::GetAtt" : [ "Subnet1", "AvailabilityZone" ] },
+                "Size" : 4,
+                "Tags" : [
+                    {
+                        "Key" : "Name",
+                        "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "EBS" ] ] }
+                    },
+                    {
+                        "Key" : "infrakit.scope",
+                        "Value" : {"Ref": "AWS::StackName"}
+                    },
+                    {
+                        "Key" : "docker-infrakit-volume",
+                        "Value" : "172.31.16.101"
+                    }
+                ]
+            }
+        },
+
+        "Volume2" : {
+            "Type":"AWS::EC2::Volume",
+            "Properties" : {
+                "AvailabilityZone" :  { "Fn::GetAtt" : [ "Subnet1", "AvailabilityZone" ] },
+                "Size" : 4,
+                "Tags" : [
+                    {
+                        "Key" : "Name",
+                        "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "EBS" ] ] }
+                    },
+                    {
+                        "Key" : "infrakit.scope",
+                        "Value" : {"Ref": "AWS::StackName"}
+                    },
+                    {
+                        "Key" : "docker-infrakit-volume",
+                        "Value" : "172.31.16.102"
+                    }
+                ]
+            }
+        },
+
+        "Volume3" : {
+            "Type":"AWS::EC2::Volume",
+            "Properties" : {
+                "AvailabilityZone" :  { "Fn::GetAtt" : [ "Subnet1", "AvailabilityZone" ] },
+                "Size" : 4,
+                "Tags" : [
+                    {
+                        "Key" : "Name",
+                        "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "EBS" ] ] }
+                    },
+                    {
+                        "Key" : "infrakit.scope",
+                        "Value" : {"Ref": "AWS::StackName"}
+                    },
+                    {
+                        "Key" : "docker-infrakit-volume",
+                        "Value" : "172.31.16.103"
+                    }
+                ]
+            }
+        },
+
+        "BootstrapInstanceVolumeAttachment" : {
+            "Type":"AWS::EC2::VolumeAttachment",
+            "Properties" : {
+                "Device" : "/dev/xvdf",
+                "InstanceId" : {"Ref": "BootstrapInstance"},
+                "VolumeId" : {"Ref": "Volume1" }
+            }
+        },
+
+        "BootstrapInstance" : {
+            "DependsOn": "Subnet1",
+            "Type" : "AWS::EC2::Instance",
+            "Properties" : {
+                "KeyName" : { "Ref" : "KeyName" },
+                "InstanceType" : { "Ref" : "InstanceType" },
+                "IamInstanceProfile" : { "Ref" : "InstanceProfile" },
+                "NetworkInterfaces" : [
+                    {
+                        "DeviceIndex" : "0",
+                        "Description" : "main interface",
+                        "DeleteOnTermination" : true,
+                        "AssociatePublicIpAddress" : true,
+                        "PrivateIpAddress" : { "Ref": "BootstrapNodePrivateIP" },
+                        "SubnetId" : { "Ref" : "Subnet1" },
+                        "GroupSet" : [ {"Ref" : "SecurityGroup"} ]
+                    }
+                ],
+                "AvailabilityZone" : { "Fn::GetAtt" : [ "Subnet1", "AvailabilityZone" ] },
+                "ImageId" : {
+                    "Fn::FindInMap": [
+                        { "Fn::FindInMap" : [ "AMISelector", { "Ref" : "PreinstalledDockerAMI" }, "ami" ] },
+                        { "Ref": "AWS::Region" },
+                        { "Fn::FindInMap": ["AWSInstanceType2Arch", {"Ref" : "InstanceType"}, "Arch"]}
+                    ]
+                },
+                "UserData" : {
+                    "Fn::Base64" : {
+                        "Fn::Join" :
+                        [ "", [
+                            "#!/bin/sh \n",
+                            {
+                                "Fn::FindInMap": [ "AMISelector", { "Ref" : "PreinstalledDockerAMI" }, "userdata" ]
+                            },
+                            "mkdir -p /infrakit\n",
+                            "docker swarm init\n",
+                            "docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v /infrakit:/infrakit ",
+                            {"Ref":"Infrakit"},
+                            "INFRAKIT_MANAGER_BACKEND=swarm ",
+                            "infrakit util init --group-id managers --start combo --start swarm --wait 5s",
+                               " --var /cluster/provider=aws",
+                               " --var /cluster/name=", {"Ref":"AWS::StackName"},
+                               " --var /cluster/size=", {"Ref":"ClusterSize"},
+                               " --var /infrakit/config/root=", {"Ref":"InfrakitConfigRoot"},
+                               " --var /infrakit/metadata/configURL=", {"Ref":"MetadataExportTemplate"},
+                               " --var /provider/image/hasDocker=", {
+                                       "Fn::FindInMap": ["AMISelector", { "Ref":"PreinstalledDockerAMI" }, "hasDocker"]
+                                       },
+                               " --var /infrakit/docker/image=", {"Ref":"Infrakit"}, " ",
+                               {"Ref":"InfrakitConfigRoot"}, "/groups.json",
+                               " | tee /var/lib/infrakit.boot | sh \n"
+                        ]]
+                    }
+                },
+                "Tags" : [
+                    {
+                        "Key" : "Name",
+                        "Value" : { "Fn::Join": [ "-", [ { "Ref": "AWS::StackName"}, "Bootstrap" ] ] }
+                    },
+                    {
+                        "Key" : "infrakit.scope",
+                        "Value" : {"Ref":"AWS::StackName"}
+                    },
+                    {
+                        "Key" : "infrakit.group",
+                        "Value" : "managers"
+                    },
+                    {
+                        "Key" : "infrakit.config_sha",
+                        "Value" : "bootstrap"
+                    },
+                    {
+                        "Key" : "infrakit.role",
+                        "Value" : "managers"
+                    }
+                ]
+            }
+        }
+    },
+
+    "Outputs" : {
+        "BootNodePublicIP" : {
+            "Description" : "The public IP of the boot node",
+            "Value" : { "Fn::GetAtt" : [ "BootstrapInstance", "PublicIp" ] }
+        }
+    }
+}

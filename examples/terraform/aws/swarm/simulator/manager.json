@@ -1,0 +1,16 @@
+{{/*
+
+Instance plugin config for managers on simulator
+
+*/}}
+{
+    "Plugin": "simulator/compute",
+    "Properties": {
+        "Tags": {
+            "infrakit.clusterName": "{{ var `/cluster/name` }}",
+            "infrakit.role" : "managers",
+            "Name": "{{ var `/cluster/name` }}-manager"
+        },
+        "Type" : "simulator-large"
+    }
+}
