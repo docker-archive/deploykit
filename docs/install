@@ -21,6 +21,9 @@ case "$(uname)" in
 	;;
 esac
 
-
-docker run --rm -v $dir:/build infrakit/installer:latest build-infrakit $target
-sudo cp ./infrakit /usr/local/bin
+echo "Building infrakit..."
+docker run --name install_infrakit infrakit/installer:latest build-infrakit $target
+echo "Copying to /usr/local/bin via sudo..."
+sudo docker cp install_infrakit:/build/infrakit /usr/local/bin
+echo "Clean up installer..."
+docker rm install_infrakit && docker image rm infrakit/installer:latest
