@@ -45,4 +45,6 @@ go build -o /build/${BINARY} ${BUILD_FLAGS} -tags "${GO_BUILD_TAGS}" \
    -ldflags "-s -w -X github.com/docker/infrakit/pkg/cli.Version=${VERSION} -X github.com/docker/infrakit/pkg/cli.Revision=${REVISION} -X github.com/docker/infrakit/pkg/util/docker.ClientVersion=${DOCKER_CLIENT_VERSION} -extldflags \"-static\"" \
    ${PACKAGE}
 
-echo "Done.  You may want to copy the file to your path, like:  'sudo cp ./infrakit /usr/local/bin/'"
+echo "Done.  Binary is in /build/${BINARY}"
+# Test
+echo "Testing the compiled binary: $(/build/${BINARY} version)"

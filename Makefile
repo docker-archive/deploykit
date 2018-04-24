@@ -184,7 +184,7 @@ DOCKER_TAG?=dev
 build-devbundle:
 	@echo "+ $@"
 	GOOS=linux GOARCH=amd64 make build-in-container
-	@docker build ${DOCKER_BUILD_FLAGS} \
+	@docker build --no-cache ${DOCKER_BUILD_FLAGS} \
 	-t ${DOCKER_IMAGE}:${DOCKER_TAG} \
 	-f ${CURDIR}/dockerfiles/Dockerfile.bundle .
 ifeq (${DOCKER_PUSH},true)
@@ -200,7 +200,7 @@ INSTALLER_IMAGE?=infrakit/installer
 INSTALLER_TAG?=$(REVISION)
 build-installer:
 	@echo "+ $@"
-	@docker build -t ${INSTALLER_IMAGE}:${INSTALLER_TAG} -t ${INSTALLER_IMAGE}:latest \
+	@docker build --no-cache -t ${INSTALLER_IMAGE}:${INSTALLER_TAG} -t ${INSTALLER_IMAGE}:latest \
 	-f ${CURDIR}/dockerfiles/Dockerfile.installer .
 ifeq (${DOCKER_PUSH},true)
 	@docker push ${INSTALLER_IMAGE}:${INSTALLER_TAG}
