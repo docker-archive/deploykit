@@ -19,7 +19,7 @@ var log = logutil.New("module", "cli/backend/ssh")
 
 func init() {
 	backend.Register("ssh", Script, func(params backend.Parameters) {
-		params.StringSlice("hostport", []string{}, "Host:port eg. localhost:22")
+		params.StringSlice("hostport", []string{}, "Host:port eg. 10.10.100.101:22 or `localhost`")
 		params.String("user", "", "username")
 		params.String("password", "", "password")
 		params.String("keyfile", "", "keyfile e.g. $HOME/.ssh/id_rsa")
@@ -38,6 +38,7 @@ func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 		if err != nil {
 			return err
 		}
+
 		user, err := parameters.GetString("user")
 		if err != nil {
 			return err
@@ -86,27 +87,44 @@ func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 
 		var wg sync.WaitGroup
 
+		if len(hostports) == 0 {
+			hostports = append(hostports, "localhost")
+		}
+
 		for _, hostport := range hostports {
 
-			cl := base
-			cl.Remote = ssh.HostPort(hostport)
+			switch hostport {
+			case "localhost":
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					if err := execScript(nil, script, args, out); err != nil {
+						log.Error("error", "remote", "localhost", "err", err)
+						return
+					}
+				}()
 
-			log.Debug("running", "remote", cl.Remote)
+			default:
+				cl := base
+				cl.Remote = ssh.HostPort(hostport)
 
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+				log.Debug("running", "remote", cl.Remote)
 
-				exec, err := cl.Exec()
-				if err != nil {
-					log.Error("cannot connect", "remote", cl.Remote, "err", err)
-					return
-				}
-				if err := execScript(exec, script, args, out); err != nil {
-					log.Error("error", "remote", cl.Remote, "err", err)
-					return
-				}
-			}()
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+
+					exec, err := cl.Exec()
+					if err != nil {
+						log.Error("cannot connect", "remote", cl.Remote, "err", err)
+						return
+					}
+					if err := execScript(exec, script, args, out); err != nil {
+						log.Error("error", "remote", cl.Remote, "err", err)
+						return
+					}
+				}()
+			}
 		}
 
 		wg.Wait()
@@ -114,12 +132,20 @@ func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 	}, nil
 }
 
+// impl == nil when running on localhost
 func execScript(impl exec.Interface, script string, args []string, out io.Writer) error {
 	cmd := strings.Join(append([]string{"/bin/sh"}, args...), " ")
 	log.Debug("sh", "cmd", cmd)
 
 	run := exec.Command(cmd)
-	run.WithExec(impl).StartWithHandlers(
+
+	if impl != nil {
+		run = run.WithExec(impl)
+	} else {
+		run = run.InheritEnvs(true)
+	}
+
+	run.StartWithHandlers(
 		func(stdin io.Writer) error {
 			_, err := stdin.Write([]byte(script))
 			return err
