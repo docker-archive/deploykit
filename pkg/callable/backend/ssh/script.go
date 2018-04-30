@@ -22,7 +22,7 @@ func init() {
 		params.StringSlice("hostport", []string{}, "Host:port eg. 10.10.100.101:22 or `localhost`")
 		params.String("user", "", "username")
 		params.String("password", "", "password")
-		params.String("keyfile", "", "keyfile e.g. $HOME/.ssh/id_rsa")
+		params.String("keyfile", "", "keyfile[:user] e.g. $HOME/.ssh/id_rsa, if [:user] present, sets user too")
 	})
 }
 
@@ -75,14 +75,20 @@ func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 
 		var base ssh.Conn
 		if keyfile != "" {
+			if parts := strings.SplitN(keyfile, ":", 2); len(parts) == 2 && user == "" {
+				keyfile = parts[0]
+				user = parts[1]
+			}
 			base.Config = ssh.PublicKeyConfig(user, keyfile)
 			log.Debug("using public key auth", "user", user, "keyfile", keyfile)
-		} else if password != "" {
+		} else if password != "" && user != "" {
 			base.Config = ssh.UsernamePasswordConfig(user, password)
 			log.Debug("using password auth", "user", user)
-		} else {
+		} else if user == "" {
 			base.Config = ssh.AgentConfig(user)
 			log.Debug("using ssh agent auth", "user", user)
+		} else {
+			return fmt.Errorf("Canot auth: missing user")
 		}
 
 		var wg sync.WaitGroup
@@ -105,6 +111,12 @@ func Script(scope scope.Scope, test bool, opt ...interface{}) (backend.ExecFunc,
 				}()
 
 			default:
+
+				// Default port is 22 if not specified
+				if strings.Index(hostport, ":") < 0 {
+					hostport += ":22"
+				}
+
 				cl := base
 				cl.Remote = ssh.HostPort(hostport)
 
