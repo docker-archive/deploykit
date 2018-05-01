@@ -77,9 +77,6 @@ type Callable struct {
 	lock sync.RWMutex
 }
 
-// TemplateFunc is a function that returns the template
-type TemplateFunc func(url string, opts template.Options) (*template.Template, error)
-
 // NewCallable creates a callable
 func NewCallable(scope scope.Scope, src string, parameters backend.Parameters, options Options) *Callable {
 	// Note that because Callable embeds Parameters and implements the methods in Parameters, a Callable
