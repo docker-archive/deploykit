@@ -9,10 +9,10 @@ vars : vars.sh
 inventory : inventory.yml
 
 # The resource config for entire mystack
-phase1 : mystack.yml
+vpc : mystack.yml
 
 # The resource config for nodes after phase1
-phase2 : nodes.yml
+nodes : nodes.yml
 
 # The specific resources we can provision
 resources : resources/index.yml

@@ -1,13 +1,15 @@
 {{/* =% sh %= */}}
 
-{{ $clearState := flag "clear-state" "bool" "Clear stored states" | prompt "Clear state?" "bool" true }}
+{{ $clearState := flag "clear-state" "bool" "Clear stored states" | prompt "Clear state?" "bool" false }}
 
 {{ $profile := flag "aws-cred-profile" "string" "Profile name" | prompt "Profile for your .aws/credentials?" "string" "default" }}
 {{ $region := flag "region" "string" "aws region" | prompt "Region?" "string" "eu-central-1"}}
 
+echo "Clear stale pids"
+rm -rf $HOME/.infrakit/plugins/* # remove sockets, pid files, etc.
+
 {{ if $clearState }}
 echo "Clear local state from previous runs"
-rm -rf $HOME/.infrakit/plugins/* # remove sockets, pid files, etc.
 rm -rf $HOME/.infrakit/configs/* # for file based manager
 # Since we are using file based leader detection, write the default name (manager1) to the leader file.
 echo manager1 > $HOME/.infrakit/leader
@@ -32,8 +34,8 @@ AWS_ACCESS_KEY_ID={{ $creds.aws_access_key_id }} \
 AWS_SECRET_ACCESS_KEY={{ $creds.aws_secret_access_key }} \
 INFRAKIT_AWS_REGION={{ $region }} \
 INFRAKIT_AWS_NAMESPACE_TAGS="infrakit_namespace={{ $namespace }}" \
-INFRAKIT_MANAGER_CONTROLLERS=resource,inventory \
-infrakit plugin start manager:mystack vars group resource inventory aws \
+INFRAKIT_MANAGER_CONTROLLERS=resource,inventory,pool \
+infrakit plugin start manager:mystack vars group resource inventory pool aws \
 	 --log 5 --log-stack --log-debug-V 1000 \
 	 --log-debug-match module=controller/resource \
 	 --log-debug-match module=provider/aws \

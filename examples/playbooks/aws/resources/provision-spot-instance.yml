@@ -2,14 +2,13 @@
 {{/* =% instanceProvision `aws/ec2-spot-instance` %= */}}
 
 {{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
-{{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
+{{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-7c412f13" }}
 {{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
 {{ $name := param "name" "string" "Host name" | prompt "Host name?" "string" (cat $project `-` (randAlphaNum 8) | nospace ) }}
 {{ $spotPrice := param "spot-price" "string" "Spot price" | prompt "Spot price?" "string" "0.03" }}
 {{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
 {{ $subnetId := param "subnet-id" "string" "subnet ID" | prompt "Subnet?" "string" "" }}
 {{ $az := param "az" "string" "availability zone" | prompt "AZ?" "string" "" }}
-{{ $privateIp := param "private-ip" "string" "IP" | prompt "Private IP address?" "string" "" }}
 {{ $securityGroupID := param "security-group-id" "string" "security group" | prompt "Security group ID?" "string" "" }}
 
 
@@ -39,7 +38,7 @@ Properties:
         Groups:
         - {{ $securityGroupID }}
         NetworkInterfaceId: null
-        PrivateIpAddress: {{ $privateIp  }}
+        PrivateIpAddress: null  # let their IPAM pick an ip address
         PrivateIpAddresses: null
         SecondaryPrivateIpAddressCount: null
         SubnetId: {{ $subnetId }}

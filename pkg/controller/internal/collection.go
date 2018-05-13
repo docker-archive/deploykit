@@ -51,10 +51,17 @@ type Item struct {
 
 // Error associates an error
 func (i *Item) Error(err error) {
+
+	const errorKey = "error"
+
 	if i.Data == nil {
 		i.Data = map[string]interface{}{}
 	}
-	i.Data["error"] = err.Error()
+	if err != nil {
+		i.Data[errorKey] = err.Error()
+	} else {
+		delete(i.Data, errorKey)
+	}
 }
 
 // Collection is a Managed that tracks a set of finite state machines.

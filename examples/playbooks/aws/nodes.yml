@@ -1,65 +1,67 @@
-{{/* =% text %= */}}
+{{/* =% controllerCommit %= */}}
 
-{{ $subnet := param "subnet" "string" "subnet" | prompt "Subnet?" "string" "subnet2" }}
-
-{{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
-
-{{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-df8406b0" }}
-
-{{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
-
-{{ $spotPrice := param "spot-price" "string" "Spot price" | prompt "Spot price?" "string" "0.03" }}
-
-{{/* subnet id from subnet name */}}
 {{ $project := metadata `mystack/vars/project` }}
 
-{{ $subnetKey := list `resource` $project $subnet `Properties` | join `/` }}
+{{ $instanceType := param "instance-type" "string" "instance type" | prompt "Instance type?" "string" "t2.micro" }}
+{{ $imageId := param "image-id" "string" "Image ID" | prompt "AMI?" "string" "ami-7c412f13" }}
+{{ $keyName := param "key" "string" "ssh key name" | prompt "SSH key?" "string" "infrakit"}}
+{{ $spotPrice := param "spot-price" "string" "Spot price" | prompt "Spot price?" "string" "0.03" }}
 
-{{ $subnetId := list $subnetKey `SubnetId` | join `/` | metadata }}
-{{ $az := list $subnetKey `AvailabilityZone` | join `/` | metadata }}
-{{ $cidr := list $subnetKey `CidrBlock` | join `/` | metadata }}
+{{ $subnetId := param "subnet-id" "string" "subnet ID" | prompt "Subnet?" "string" "" }}
+{{ $az := param "az" "string" "availability zone" | prompt "AZ?" "string" "" }}
+{{ $securityGroupID := param "security-group-id" "string" "security group" | prompt "Security group ID?" "string" "" }}
 
-{{ $securityGroupKey := list `resource` $project `sg1` `Properties` | join `/` }}
-{{ $securityGroupID := list $securityGroupKey `GroupId` | join `/` | metadata }}
+{{ $count := param "count" "int" "Count" | prompt "How many?" "int" 6 }}
+{{ $parallelism := param "parallelism" "int" "Parallelism" | prompt "How many at a time?" "int" 2 }}
 
-{{ $privateIp := param "private-ip" "string" "IP" | prompt "Private IP address?" "string" $cidr }}
-
-kind: resource
+kind: pool
 metadata:
   name: {{ $project }}-nodes
 options:
   ObserveInterval: 10s
+  # This is the size of the buffered channel for the finite state machine work queue -- needs to be at least the count.
+  BufferSize: {{ mul $count 10 | add 1024 }} # controls the fsm engine's queue capacity
+  # observation's inbound channel capacity -- needs to be at least the same as the number of resource objects.
+  ChannelBufferSize: {{ mul $count 10 | add 1024 }}
+  # How long to wait before we start the provision process, in unit of time (ticks)
+  WaitBeforeProvision: 3
+  # How long to wait before we start the termination / destroy, in unit of time (ticks)
+  WaitBeforeDestroy: 3
+
 properties:
-
-
-  host1:
-    plugin: aws/ec2-spot-instance
-    select:
-      Name: {{ $project }}-host1
-      infrakit_scope: {{ $project }}
-    init: |
+  plugin: aws/ec2-spot-instance
+  count: {{ $count }}   # how many in the pool
+  parallelism: {{ $parallelism }}  # how many to provision / destroy at a time
+  select:
+    az: az1
+    type: compute
+  tags:
+    node_label: test
+  init: |
       #!/bin/bash
       sudo add-apt-repository ppa:gophers/archive
       sudo apt-get update -y
-      sudo apt-get install -y wget curl git golang-1.9-go
-      wget -qO- https://get.docker.com | sh
-      ln -s /usr/lib/go-1.9/bin/go /usr/local/bin/go
-    properties:
-      RequestSpotInstancesInput:
-        SpotPrice: "{{ $spotPrice }}"
-        Type: one-time
-        LaunchSpecification:
-          ImageId: {{ $imageId }}
-          InstanceType: {{ $instanceType }}
-          KeyName: {{ $keyName }}
-          NetworkInterfaces:
-            - AssociatePublicIpAddress: true
-              DeleteOnTermination: true
-              DeviceIndex: 0
-              Groups:
-                - {{ $securityGroupID }}
-              NetworkInterfaceId: null
-              PrivateIpAddress: {{ $privateIp  }}
-              SubnetId: {{ $subnetId }}
-          Placement:
-            AvailabilityZone: {{ $az }}
+      # install golang
+      sudo apt-get install -y wget curl git golang-1.10-go
+      ln -s /usr/lib/go-1.10/bin/go /usr/local/bin/go
+      # install docker CE
+      curl -sSL https://get.docker.com | sh
+      # install infrakit
+      curl -sSL https://docker.github.io/infrakit/install | sh
+  properties:
+    RequestSpotInstancesInput:
+      SpotPrice: "{{ $spotPrice }}"
+      Type: one-time
+      LaunchSpecification:
+        ImageId: {{ $imageId }}
+        InstanceType: {{ $instanceType }}
+        KeyName: {{ $keyName }}
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: true
+            DeleteOnTermination: true
+            DeviceIndex: 0
+            Groups:
+              - {{ $securityGroupID }}
+            SubnetId: {{ $subnetId }}
+        Placement:
+          AvailabilityZone: {{ $az }}

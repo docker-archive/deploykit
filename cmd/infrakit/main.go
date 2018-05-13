@@ -35,6 +35,7 @@ import (
 	_ "github.com/docker/infrakit/pkg/cli/v0"
 
 	// Callable backends via playbook or via lib
+	_ "github.com/docker/infrakit/pkg/callable/backend/controller"
 	_ "github.com/docker/infrakit/pkg/callable/backend/http"
 	_ "github.com/docker/infrakit/pkg/callable/backend/instance"
 	_ "github.com/docker/infrakit/pkg/callable/backend/print"

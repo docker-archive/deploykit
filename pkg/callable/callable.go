@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"strconv"
@@ -17,12 +18,6 @@ import (
 	"github.com/docker/infrakit/pkg/run/scope"
 	"github.com/docker/infrakit/pkg/template"
 	"github.com/docker/infrakit/pkg/types"
-)
-
-const (
-	// none is used to determine if the user has set the bool flag value. this allows the
-	// use of pipe to a prompt like {{ $foo = flag "flag" "bool" "message" | prompt "foo?" "bool" }}
-	none = -1
 )
 
 // Options has optional settings for a call.  It can be in a CLI (where Parameters are implemented by flags) or
@@ -92,6 +87,12 @@ func NewCallable(scope scope.Scope, src string, parameters backend.Parameters, o
 	}
 }
 
+const (
+	missingInt   = int(math.MinInt64)
+	missingFloat = float64(math.SmallestNonzeroFloat64)
+	missingBool  = ""
+)
+
 // name, type, description of the flag, and a default value, which can be nil
 // the returned value if the nil value
 func (c *Callable) defineParameter(name, ftype, desc string, def interface{}) (interface{}, error) {
@@ -116,7 +117,8 @@ func (c *Callable) defineParameter(name, ftype, desc string, def interface{}) (i
 		return defaultValue, nil
 
 	case "int":
-		defaultValue := 0 // TODO - encode a nil with a special value?
+		defaultValue := missingInt
+		// TODO - encode a nil with a special value?
 		if def != nil {
 			if v, ok := def.(int); ok {
 				defaultValue = v
@@ -128,7 +130,7 @@ func (c *Callable) defineParameter(name, ftype, desc string, def interface{}) (i
 		return defaultValue, nil
 
 	case "float":
-		defaultValue := float64(0.)
+		defaultValue := missingFloat
 		if def != nil {
 			if v, ok := def.(float64); ok {
 				defaultValue = v
@@ -186,9 +188,8 @@ func (c *Callable) defineParameter(name, ftype, desc string, def interface{}) (i
 			return defaultValue, nil
 		}
 		// At definition time, there is no default value, so we use string
-		// to model three states: true, false, none
-		parameters.Int(name, none, desc)
-		return none, nil
+		parameters.String(name, missingBool, desc+" (use string bool value [true|false])")
+		return missingBool, nil
 	}
 	return nil, fmt.Errorf("unknown type %v", ftype)
 }
@@ -222,14 +223,14 @@ func (c *Callable) getParameter(name, ftype, desc string, def interface{}) (inte
 		if def == nil {
 			// If default v is not specified, then we assume the flag was defined
 			// using a string to handle the none case
-			v, err := parameters.GetInt(name)
+			v, err := parameters.GetString(name)
 			if err != nil {
-				return none, err
+				return missingBool, err
 			}
-			if v == none {
-				return none, nil //
+			if v == missingBool {
+				return missingBool, nil //
 			}
-			return v > 0, nil
+			return strconv.ParseBool(v)
 		}
 		return parameters.GetBool(name)
 	}
@@ -246,11 +247,11 @@ func Missing(t string, v interface{}) bool {
 	case "string":
 		return v.(string) == ""
 	case "int":
-		return v.(int) == 0
+		return v.(int) == missingInt
 	case "float":
-		return v.(float64) == 0.
+		return v.(float64) == missingFloat
 	case "bool":
-		return v == none
+		return v == missingBool
 	}
 	return true
 }

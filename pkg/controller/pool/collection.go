@@ -385,8 +385,6 @@ func (c *collection) run(ctx context.Context) {
 					timer := time.NewTimer(c.options.ProvisionDeadline.Duration())
 					done := make(chan struct{})
 
-					item.State.Signal(provisionStart)
-
 					go func() {
 						defer func() {
 							e := recover()
@@ -510,6 +508,7 @@ func (c *collection) run(ctx context.Context) {
 					log.Debug("found", "instance", n, "key", k, "V", debugV2)
 					item.State.Signal(resourceFound)
 					item.Data["instance"] = n
+					item.Error(nil) // clear any previous error if this is from a retry
 				}
 
 				c.MetadataExport(c.accessor.KeyOf, export)
