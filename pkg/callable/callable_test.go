@@ -21,9 +21,9 @@ import (
 
 func TestMissing(t *testing.T) {
 	require.True(t, Missing("string", ""))
-	require.True(t, Missing("int", 0))
-	require.True(t, Missing("float", 0.))
-	require.True(t, Missing("bool", none))
+	require.True(t, Missing("int", missingInt))
+	require.True(t, Missing("float", missingFloat))
+	require.True(t, Missing("bool", missingBool))
 	require.False(t, Missing("bool", false))
 	require.False(t, Missing("bool", true))
 }
