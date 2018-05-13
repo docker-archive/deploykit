@@ -9,3 +9,6 @@ COPY dockerfiles/build-infrakit /usr/local/bin/
 
 # Add source code
 Add . /go/src/github.com/docker/infrakit/
+
+RUN mkdir /build
+VOLUME /build

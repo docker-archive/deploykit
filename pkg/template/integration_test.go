@@ -307,14 +307,14 @@ func TestSourceWithHeaders(t *testing.T) {
 	//     "A": "B",
 	//     "Accept": "*/*",
 	//     "Connection": "close",
-	//     "Foo": "Bar",
+	//     "Foo": "Bar,Bar",
 	//     "Host": "httpbin.org",
 	//     "User-Agent": "curl/7.43.0"
 	//   }
 	// }
 
 	require.Equal(t, map[string]interface{}{
-		"Foo":             "Bar",
+		"Foo":             "Bar,Bar",
 		"Host":            "httpbin.org",
 		"User-Agent":      "Go-http-client/1.1",
 		"A":               "B",
