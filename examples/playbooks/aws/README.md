@@ -40,7 +40,7 @@ $ infrakit local resource tail / --view 'str://{{.Type}} - {{.ID}} - {{.Message}
 3. In another terminal, commit the spec to monitor resources as they are created:
 
 ```
-$infrakit use aws inventory.yml | infrakit local mystack/inventory commit -y -
+$infrakit use aws inventory --plugin mystack/inventory
 ```
 
 Before any resources are created, we expect to see no metadata:
@@ -50,7 +50,48 @@ $ infrakit local inventory/myproject keys -al
 total 0:
 ```
 
-4. Commit the `mystack.yml` playbook to the resource controller.  This file
+4. Set up project specific variables: this example uses the `metadata` plugin
+to set some global variables.  Run this to set them
+
+```
+$ infrakit use aws vars
+Project? [myproject]: 
+CIDR block? [10.0.0.0/16]: 
+CIDR block? [10.0.100.0/24]: 
+CIDR block? [10.0.200.0/24]: 
+Availability Zone? [eu-central-1a]: 
+Availability Zone? [eu-central-1b]: 
+Proposing 0 changes, hash=b3e009daf23a4c248eb7a7003e778c78
+{
+  "cidr": "10.0.0.0/16",
+  "project": "myproject",
+  "subnet1": {
+    "az": "eu-central-1a",
+    "cidr": "10.0.100.0/24"
+  },
+  "subnet2": {
+    "az": "eu-central-1b",
+    "cidr": "10.0.200.0/24"
+  }
+}
+Project is myproject
+Proposing 0 changes, hash=b3e009daf23a4c248eb7a7003e778c78
+{
+  "cidr": "10.0.0.0/16",
+  "project": "myproject",
+  "subnet1": {
+    "az": "eu-central-1a",
+    "cidr": "10.0.100.0/24"
+  },
+  "subnet2": {
+    "az": "eu-central-1b",
+    "cidr": "10.0.200.0/24"
+  }
+}
+```
+
+
+5. Commit the `mystack.yml` playbook to the resource controller.  This file
 has specs of all the resources and their dependencies in one place.  The
 playbook also contains other commands to provision the resources individually
 (eg. `infrakit use aws vpc` will provision just a vpc).
@@ -68,7 +109,7 @@ the resources in the VPC.  In this case it will provision these resources:
 Commit the file:
 
 ```
-$ $ infrakit use aws mystack | infrakit local mystack/resource commit -y -
+$ infrakit use aws vpc --plugin mystack/resource
 Please enter your user name: [davidchung]:
 Project? [myproject]:
 CIDR block? [10.0.0.0/16]:
@@ -522,11 +563,27 @@ networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_link_context
 networking/aws/ec2-vpc/myproject-vpc/Tags/infrakit_link_created
 ```
 
-5. Provision a spot instance in your new VPC
+6. Provision a spot instance in your new VPC
 
 There's an playbook command called `spot` which will guide you through
-provisioning a single spot instance in one of the subnets.  You can pick
-`subnet1` or `subnet2` in the prompt.
+provisioning a single spot instance in one of the subnets.
+When answering the questions you will be asked to provide vpc and subnet
+ids.  To get those values, do
+
+```
+$ infrakit local mystack/resource describe -o
+COLLECTION            KEY                   STATE                 DATA
+myproject             igw                   READY                 igw-08e6cb5872f1b83cb
+myproject             rtb                   READY                 rtb-0c3ff9daa89a5e06c
+myproject             sg1                   READY                 sg-0ea554fba9c28b3bf
+myproject             subnet1               READY                 subnet-01b5e450f49749676
+myproject             subnet2               READY                 subnet-09c5c220a71268f7a
+myproject             vpc                   READY                 vpc-07003eb7f376414b1
+```
+
+The resource's infrastructure resource ids will be listed as `DATA` along side the logical
+ids (e.g `sg1`) you have given them in the `mystack.yml`.  Use these values in the steps that follow
+to provision a single spot instance or a pool of spot instances.
 
 ```
 $ infrakit use aws spot
@@ -543,7 +600,9 @@ Security group ID? [sg-2e3f8143]:
 ```
 
 This command can sometimes timeout because it takes a while to provision a spot
-instance.  In this case, you can see if it's created:
+instance.  You can set `INFRAKIT_CLIENT_TIMEOUT=10s` as environment variable prior
+to running `infrakit use aws spot`.  In case the client times out, you can see if
+the instance has been created:
 
 ```
 $ infrakit local aws/ec2-spot-instance describe
@@ -557,21 +616,52 @@ or via the inventory controller.   We query for entries under the `compute` cate
 
 ```
 $ infrakit local inventory/myproject keys compute/aws/ec2-spot-instance
-myproject-Zm6UfgDt
+myproject-YjM9d5Vs
 
-$infrakit local inventory/myproject keys compute/aws/ec2-spot-instance/myproject-Zm6UfgDt/Properties/Instance
+infrakit local inventory/myproject keys -al compute/aws/ec2-spot-instance/myproject-YjM9d5Vs
+total 132:
+ID
+LogicalID
+Properties/Instance/AmiLaunchIndex
+Properties/Instance/Architecture
+Properties/Instance/BlockDeviceMappings/[0]/DeviceName
+Properties/Instance/BlockDeviceMappings/[0]/Ebs/AttachTime
+Properties/Instance/BlockDeviceMappings/[0]/Ebs/DeleteOnTermination
+Properties/Instance/BlockDeviceMappings/[0]/Ebs/Status
+Properties/Instance/BlockDeviceMappings/[0]/Ebs/VolumeId
+Properties/Instance/ClientToken
+Properties/Instance/EbsOptimized
+Properties/Instance/EnaSupport
+Properties/Instance/Hypervisor
+Properties/Instance/IamInstanceProfile
+Properties/Instance/ImageId
+Properties/Instance/InstanceId
+Properties/Instance/InstanceLifecycle
+Properties/Instance/InstanceType
+Properties/Instance/KernelId
+Properties/Instance/KeyName
+Properties/Instance/LaunchTime
+Properties/Instance/Monitoring/State
+Properties/Instance/NetworkInterfaces/[0]/Association/IpOwnerId
+# more fields...
 
-# A bunch of fields...
-
-$ infrakit local inventory/myproject cat compute/aws/ec2-spot-instance/myproject-Zm6UfgDt/Properties/Instance/PublicIpAddress
-18.196.88.253
+$ infrakit local inventory/myproject cat compute/aws/ec2-spot-instance/myproject-YjM9d5Vs/Properties/Instance/PublicIpAddress
+18.184.52.135
 ```
 
-Let's try to ssh in:
+Let's ssh in:
 
 ```
-$ ssh ubuntu@$(infrakit local inventory/myproject cat compute/aws/ec2-spot-instance/myproject-Zm6UfgDt/Properties/Instance/PublicIpAddress)
-Welcome to Ubuntu 16.04.3 LTS (GNU/Linux 4.4.0-1041-aws x86_64)
+~$ eval `ssh-agent -s`
+Agent pid 35295
+~$ ssh-add ~/.ssh/infrakit
+Identity added: /Users/davidchung/.ssh/infrakit (/Users/davidchung/.ssh/infrakit)
+~$ ssh ubuntu@$(infrakit local inventory/myproject cat compute/aws/ec2-spot-instance/myproject-YjM9d5Vs/Properties/Instance/PublicIpAddress)
+The authenticity of host '18.184.52.135 (18.184.52.135)' can't be established.
+ECDSA key fingerprint is SHA256:EnKhV+8cgUjQzL1Wvh2nwS+T5Meoxn6K/diAJtM+o9Y.
+Are you sure you want to continue connecting (yes/no)? yes
+Warning: Permanently added '18.184.52.135' (ECDSA) to the list of known hosts.
+Welcome to Ubuntu 16.04.4 LTS (GNU/Linux 4.4.0-1052-aws x86_64)
 
  * Documentation:  https://help.ubuntu.com
  * Management:     https://landscape.canonical.com
@@ -580,14 +670,72 @@ Welcome to Ubuntu 16.04.3 LTS (GNU/Linux 4.4.0-1041-aws x86_64)
   Get cloud support with Ubuntu Advantage Cloud Guest:
     http://www.ubuntu.com/business/services/cloud
 
-107 packages can be updated.
-48 updates are security updates.
+58 packages can be updated.
+17 updates are security updates.
 
 
-*** System restart required ***
-Last login: Mon Mar 19 00:20:36 2018 from 97.105.231.235
-ubuntu@ip-10-0-200-100:~$
+
+The programs included with the Ubuntu system are free software;
+the exact distribution terms for each program are described in the
+individual files in /usr/share/doc/*/copyright.
+
+Ubuntu comes with ABSOLUTELY NO WARRANTY, to the extent permitted by
+applicable law.
+
+To run a command as administrator (user "root"), use "sudo <command>".
+See "man sudo_root" for details.
 ```
+
+7. Provision a pool of nodes:  You can use the `pool` controller to provision
+a pool of spot instances:
+
+```
+$ infrakit use aws nodes --plugin mystack/pool --az eu-central-1a --subnet-id subnet-01b5e450f49749676 --security-group-id sg-0ea554fba9c28b3bf --accept-defaults
+```
+This will provision 5 spot instances.  You can watch the progress via
+
+```
+$ watch -d infrakit local mystack/pool describe -o
+Every 2.0s: infrakit local mystack/pool describe -o
+
+COLLECTION            KEY                   STATE                 DATA
+myproject-nodes       myproject-nodes_0000  READY                 sir-46yrgvnn
+myproject-nodes       myproject-nodes_0001  READY                 sir-dxt8hk4m
+myproject-nodes       myproject-nodes_0002  READY                 sir-4z6rh6sq
+myproject-nodes       myproject-nodes_0003  READY                 sir-46tihzkq
+myproject-nodes       myproject-nodes_0004  READY                 sir-15frhx2p
+
+```
+You can scale down this pool of nodes by adding a `--count` flag:
+
+```
+infrakit use aws nodes --plugin mystack/pool --az eu-central-1a --subnet-id subnet-01b5e450f49749676 --security-group-id sg-0ea554fba9c28b3bf --count 1 --accept-defaults
+```
+
+You will see that some nodes become `UNMATCHED`:
+
+```
+Every 2.0s: infrakit local mystack/pool describe -o
+
+COLLECTION            KEY                   STATE                 DATA
+myproject-nodes       myproject-nodes_0000  READY                 sir-46yrgvnn
+myproject-nodes       myproject-nodes_0001  UNMATCHED             sir-dxt8hk4m
+myproject-nodes       myproject-nodes_0002  UNMATCHED             sir-4z6rh6sq
+myproject-nodes       myproject-nodes_0003  UNMATCHED             sir-46tihzkq
+myproject-nodes       myproject-nodes_0004  UNMATCHED             sir-15frhx2p
+
+```
+Slowly you will see the unmatched nodes be terminated and removed:
+
+```
+Every 2.0s: infrakit local mystack/pool describe -o
+
+COLLECTION            KEY                   STATE                 DATA
+myproject-nodes       myproject-nodes_0000  READY                 sir-46yrgvnn
+myproject-nodes       myproject-nodes_0003  TERMINATING           sir-46tihzkq
+myproject-nodes       myproject-nodes_0004  TERMINATING           sir-15frhx2p
+```
+
 
 ## Clean up
 

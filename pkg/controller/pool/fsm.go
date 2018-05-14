@@ -288,6 +288,9 @@ func BuildModel(properties pool.Properties, options pool.Options) (*Model, error
 		},
 		fsm.State{
 			Index: cannotProvision,
+			Transitions: map[fsm.Signal]fsm.Index{
+				resourceFound: ready, // in case a client timeout puts us in fail state...
+			},
 		},
 		fsm.State{
 			Index: cannotTerminate,

@@ -1,4 +1,4 @@
-{{/* =% text %= */}}
+{{/* =% controllerCommit %= */}}
 
 {{ $project := metadata `mystack/vars/project` }}
 {{ $cidr := metadata `mystack/vars/cidr` }}

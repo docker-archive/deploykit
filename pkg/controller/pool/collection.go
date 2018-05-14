@@ -366,7 +366,10 @@ func (c *collection) run(ctx context.Context) {
 					}
 
 					accessor := c.accessor
-					spec, err := c.buildSpec(item, accessor.Spec)
+					accessorSpec := accessor.Spec
+					accessorSpec.Properties = types.AnyBytes(accessor.Spec.Properties.Bytes())
+
+					spec, err := c.buildSpec(item, accessorSpec)
 					if err != nil {
 
 						log.Error("Error building spec",
@@ -505,6 +508,7 @@ func (c *collection) run(ctx context.Context) {
 					log.Debug("found", "instance", n, "key", k, "V", debugV2)
 					item.State.Signal(resourceFound)
 					item.Data["instance"] = n
+					item.Error(nil) // clear any previous error if this is from a retry
 				}
 
 				c.MetadataExport(c.accessor.KeyOf, export)
@@ -570,13 +574,20 @@ func (c *collection) configureAccessor(spec types.Spec, access *internal.Instanc
 }
 
 func (c *collection) buildSpec(item *internal.Item, spec instance.Spec) (instance.Spec, error) {
-
 	// Turn the spec into a blob and use that to parse the dependencies
-	specAny, err := types.AnyValue(spec)
+	any, err := types.AnyValue(spec)
 	if err != nil {
 		return spec, err
 	}
 
+	specAny, err := c.Render(any, *item) // as template
+	if err != nil {
+		return spec, err
+	}
+
+	// Evaluate any dependencies
+	// TODO - there's no actual 'cross-controller' dependencies implemented yet.
+	// This is a placeholder.
 	evaled := types.EvalDepends(specAny,
 		func(p types.Path) (interface{}, error) {
 			v := types.Get(p, c.resources)

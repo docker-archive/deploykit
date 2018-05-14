@@ -29,11 +29,15 @@ properties:
   select:
     az: az1
     type: compute
+  tags:
+    node_label: join(`-`, `node`,index())
   init: |
     sudo apt-get install -y docker
   properties:
     instanceType: xlarge
     vcpu: 8
     mem: 512G
+    private_ip: allocate_ip()
     simulator_cap: 1000    # simulator max capacity
-    simulator_delay: 1s # simulator provision latency
+    simulator_delay: 5s # simulator provision latency
+    node: join(`-`, `node`, index())
