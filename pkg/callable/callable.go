@@ -39,6 +39,15 @@ type Options struct {
 
 	// TemplateOptions has options for processing template
 	TemplateOptions template.Options
+
+	// TestMode indicates the callable is for test only. It's up to the backend to interpret this.
+	TestMode *bool
+
+	// PrintOnly will not actually invoke the backend but will instead renders the input to the backend.
+	PrintOnly *bool
+
+	// AcceptDefaults allows any unspecified parameter / flag values to use default values if set.
+	AcceptDefaults *bool
 }
 
 // Clone returns another copy, having defined the parameters
@@ -55,15 +64,12 @@ func (c *Callable) Clone(parameters backend.Parameters) (*Callable, error) {
 type Callable struct {
 	backend.Parameters // has methods of Parameters
 
-	Options Options
+	Options
 
 	*template.Template // has methods of Template
 
-	test           *bool
-	printOnly      *bool
-	acceptDefaults *bool
-	src            string
-	exec           bool
+	src  string
+	exec bool
 
 	run    func(context.Context, string, backend.Parameters, []string) error
 	script string
@@ -519,7 +525,7 @@ func (c *Callable) Funcs() []template.Function {
 
 				}
 
-				return c.Options.Prompter(prompt, ftype, *c.acceptDefaults, optional...)
+				return c.Options.Prompter(prompt, ftype, *c.AcceptDefaults, optional...)
 			},
 		},
 		{
@@ -558,7 +564,7 @@ func (c *Callable) Funcs() []template.Function {
 					}
 
 				}
-				p, err := c.Options.Prompter(prompt, ftype, *c.acceptDefaults, optional...)
+				p, err := c.Options.Prompter(prompt, ftype, *c.AcceptDefaults, optional...)
 				pl = strings.Split(p.(string), ",")
 				return pl, err
 			},
@@ -586,24 +592,32 @@ func (c *Callable) DefineParameters() (err error) {
 		return fmt.Errorf("not initialized")
 	}
 
-	c.test = c.Bool("test", false, "True to do a trial run")
-	c.printOnly = c.Bool("print-only", false, "True to print the rendered input")
-	c.acceptDefaults = c.Bool("accept-defaults", false, "True to accept defaults of prompts and flags")
+	if c.TestMode == nil {
+		c.TestMode = c.Bool("test", false, "True to do a trial run")
+	}
+
+	if c.PrintOnly == nil {
+		c.PrintOnly = c.Bool("print-only", false, "True to print the rendered input")
+	}
+
+	if c.AcceptDefaults == nil {
+		c.AcceptDefaults = c.Bool("accept-defaults", false, "True to accept defaults of prompts and flags")
+	}
 
 	t, err := c.getTemplate()
 	if err != nil {
 		return
 	}
 
-	t.SetOptions(c.Options.TemplateOptions)
+	t.SetOptions(c.TemplateOptions)
 	_, err = t.Render(c)
-	if err != nil && c.Options.ShowAllWarnings {
+	if err != nil && c.ShowAllWarnings {
 		log.Warn("Error rendering playbook while defining params", "err", err)
 	}
 
 	// add the backend-defined flags. These are flags that are
 	// applied as the backend is chosen.  The delimiter here is =% %=
-	opt := c.Options.TemplateOptions
+	opt := c.TemplateOptions
 	opt.DelimLeft = "=%"
 	opt.DelimRight = "%="
 	// Determine the backends
@@ -632,6 +646,7 @@ func (c *Callable) DefineParameters() (err error) {
 
 // Execute runs the command
 func (c *Callable) Execute(ctx context.Context, args []string, out io.Writer) (err error) {
+
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
@@ -648,10 +663,10 @@ func (c *Callable) Execute(ctx context.Context, args []string, out io.Writer) (e
 		return
 	}
 
-	opt := c.Options.TemplateOptions
+	opt := c.TemplateOptions
 
-	if c.Options.ErrOutputFunc != nil {
-		opt.Stderr = c.Options.ErrOutputFunc
+	if c.ErrOutputFunc != nil {
+		opt.Stderr = c.ErrOutputFunc
 	} else {
 		opt.Stderr = func() io.Writer { return os.Stderr }
 	}
@@ -664,14 +679,14 @@ func (c *Callable) Execute(ctx context.Context, args []string, out io.Writer) (e
 		return err
 	}
 	c.script = script
-	if *c.printOnly {
-		fmt.Print(c.script)
-		return nil
+	if *c.PrintOnly {
+		_, err := fmt.Fprint(c.OutputFunc(), c.script)
+		return err
 	}
 
 	log.Debug("running", "script", script)
 
-	opt = c.Options.TemplateOptions
+	opt = c.TemplateOptions
 	opt.DelimLeft = "=%"
 	opt.DelimRight = "%="
 	// Determine the backends
@@ -686,8 +701,8 @@ func (c *Callable) Execute(ctx context.Context, args []string, out io.Writer) (e
 		switch {
 		case out != nil:
 			ctx = backend.SetWriter(ctx, out)
-		case c.Options.OutputFunc != nil:
-			ctx = backend.SetWriter(ctx, c.Options.OutputFunc())
+		case c.OutputFunc != nil:
+			ctx = backend.SetWriter(ctx, c.OutputFunc())
 		}
 		return c.run(ctx, script, c, args)
 	}

@@ -20,6 +20,7 @@ type Module struct {
 	Options        Options
 	ParametersFunc func() backend.Parameters
 	Callables      map[string]*Callable
+	Modules        map[string]*Module
 
 	lock sync.RWMutex
 }
@@ -56,6 +57,33 @@ func (m *Module) GetCallable(name string) (*Callable, error) {
 	return c.Clone(parameters)
 }
 
+// GetModule gets the loaded sub module by name
+func (m *Module) GetModule(name string) (*Module, error) {
+	m.lock.RLock()
+	defer m.lock.RUnlock()
+	c, has := m.Modules[name]
+	if !has {
+		return nil, fmt.Errorf("not found %v", name)
+	}
+	return c, nil
+}
+
+// Find takes a path and returns a nested callable, if found, or error.
+func (m *Module) Find(path []string) (*Callable, error) {
+	switch len(path) {
+	case 0:
+		return nil, fmt.Errorf("no path")
+	case 1:
+		return m.GetCallable(path[0])
+	default:
+		mm, err := m.GetModule(path[0])
+		if err != nil {
+			return nil, err
+		}
+		return mm.Find(path[1:])
+	}
+}
+
 // List returns a list of callable names
 func (m *Module) List() []string {
 	m.lock.RLock()
@@ -76,16 +104,13 @@ func (m *Module) List() []string {
 // Load loads and initializes the module from the source
 func (m *Module) Load() error {
 
-	m.lock.Lock()
-	defer m.lock.Unlock()
-
 	index := map[string]string{}
-
 	if err := m.loadIndex(&index); err != nil {
 		return err
 	}
 
 	callables := map[string]*Callable{}
+	modules := map[string]*Module{}
 	for name, sub := range index {
 
 		fullURL := path.Join(path.Dir(m.IndexURL), sub)
@@ -103,9 +128,33 @@ func (m *Module) Load() error {
 			params = &Parameters{} // default in-memory map
 		}
 
-		callables[name] = NewCallable(m.Scope, source.String(), params, m.Options)
+		// Because a URL like https://pb.com/p/foo can point to just a directory
+		// there is no easy way to tell if a callable is in fact module (directory)
+		// So here we do the expensive operation of defining all the params and check for any errors.
+		// If an error is seen, then it's not included as a searchable callable.
+		callable := NewCallable(m.Scope, source.String(), params, m.Options)
+		if err := callable.DefineParameters(); err == nil {
+			callables[name] = callable
+		} else {
+			// check for moudule.  A module has `index.yml` inside a directory
+			sub := Module{
+				Scope:          m.Scope,
+				IndexURL:       path.Join(source.String(), "index.yml"),
+				Options:        m.Options,
+				ParametersFunc: m.ParametersFunc,
+				Callables:      map[string]*Callable{},
+				Modules:        map[string]*Module{},
+			} // shallow copy
+			if err := sub.Load(); err == nil {
+				modules[name] = &sub
+			}
+		}
 	}
 
+	m.lock.Lock()
+	defer m.lock.Unlock()
+
 	m.Callables = callables
+	m.Modules = modules
 	return nil
 }
