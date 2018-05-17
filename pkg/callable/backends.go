@@ -15,7 +15,7 @@ func (c *Callable) loadBackends(t *template.Template) error {
 		func(funcName string, backend backend.ExecFuncBuilder) {
 			t.AddFunc(funcName,
 				func(opt ...interface{}) error {
-					executor, err := backend(c.scope, *c.test, opt...)
+					executor, err := backend(c.scope, *c.Options.TestMode, opt...)
 					if err != nil {
 						return err
 					}

@@ -10,3 +10,7 @@ spot : provision-spot-instance.yml
 
 # print some lines
 lines: lines.sh
+
+vpc: sub/provision-vpc.yml
+
+sub: sub
