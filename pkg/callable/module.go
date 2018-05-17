@@ -25,7 +25,7 @@ type Module struct {
 	lock sync.RWMutex
 }
 
-func (m Module) loadIndex(model interface{}) error {
+func (m *Module) loadIndex(model interface{}) error {
 	// an index at the path specified is rendered and parsed into the provided
 	// model.
 	t, err := template.NewTemplate(m.IndexURL, m.Options.TemplateOptions)
@@ -58,14 +58,14 @@ func (m *Module) GetCallable(name string) (*Callable, error) {
 }
 
 // GetModule gets the loaded sub module by name
-func (m *Module) GetModule(name string) (Module, error) {
+func (m *Module) GetModule(name string) (*Module, error) {
 	m.lock.RLock()
 	defer m.lock.RUnlock()
 	c, has := m.Modules[name]
 	if !has {
-		return Module{}, fmt.Errorf("not found %v", name)
+		return nil, fmt.Errorf("not found %v", name)
 	}
-	return *c, nil
+	return c, nil
 }
 
 // Find takes a path and returns a nested callable, if found, or error.
@@ -137,8 +137,14 @@ func (m *Module) Load() error {
 			callables[name] = callable
 		} else {
 			// check for moudule.  A module has `index.yml` inside a directory
-			sub := *m // shallow copy
-			sub.IndexURL = path.Join(source.String(), "index.yml")
+			sub := Module{
+				Scope:          m.Scope,
+				IndexURL:       path.Join(source.String(), "index.yml"),
+				Options:        m.Options,
+				ParametersFunc: m.ParametersFunc,
+				Callables:      map[string]*Callable{},
+				Modules:        map[string]*Module{},
+			} // shallow copy
 			if err := sub.Load(); err == nil {
 				modules[name] = &sub
 			}
