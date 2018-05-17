@@ -68,9 +68,6 @@ type Callable struct {
 
 	*template.Template // has methods of Template
 
-	// test           *bool
-	// printOnly      *bool
-	// acceptDefaults *bool
 	src  string
 	exec bool
 
