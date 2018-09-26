@@ -1,0 +1,15 @@
+{{/* Input to create instance using the AWS instance plugin */}}
+{{/* =% instanceProvision `aws/ec2-internetgateway` %= */}}
+
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+
+{{ $vpcID := param "vpcID" "string" "VPC ID" | prompt "VPC ID?" "string" }}
+
+Tags:
+  infrakit_scope: {{ $project }}
+
+Properties:
+  Tags:
+    Name: {{ $project }}-igw
+  AttachInternetGatewayInput:
+    VpcId : {{ $vpcID }}

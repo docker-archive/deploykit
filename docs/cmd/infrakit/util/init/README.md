@@ -8,7 +8,7 @@ This is used primarily as a way too bootstrap the first node of a
 cluster.
 
 The `init` command also implicitly starts a `vars` plugin for storing
-your varaibles so that through successive evaluations of templates, your
+your variables so that through successive evaluations of templates, your
 configuration information is always accessible.
 
 This example here uses the `vars.json`, `groups.json`, `common.ikt`, and `init.sh`

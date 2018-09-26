@@ -1,0 +1,26 @@
+{{/* Input to create instance using the AWS instance plugin */}}
+{{/* =% instanceProvision `aws/ec2-subnet` %= */}}
+
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+
+{{ $vpcID := param "vpcID" "string" "VPC ID" | prompt "VPC ID?" "string" }}
+{{ $az := param "az" "string" "AZ" | prompt "Availability Zone?" "string" "eu-central-1b" }}
+{{ $cidr := param "cidr" "string" "CIDR Block" | prompt "CIDR block?" "string" "10.0.0.0/24" }}
+{{ $name := param "name" "string" "Subnet name" | prompt "Subnet name?" "string" "subnet-1" }}
+{{ $routeTableID := param "routeTableID" "string" "RouteTable ID" | prompt "RouteTable ID?" "string" "" }}
+{{ $code := param "code" "int" "Integer code" | prompt "Integer code?" "int" 100 }}
+
+
+Tags:
+  infrakit_scope: {{ $project }}
+  special_code : {{ $code }}
+
+Properties:
+  Tags:
+    Name: {{ $project }}-{{ $name }}
+  CreateSubnetInput:
+    VpcId : {{ $vpcID }}
+    AvailabilityZone: {{ $az }}
+    CidrBlock: {{ $cidr }}
+  RouteTableAssociation:
+    RouteTableId: {{ $routeTableID }}
