@@ -1,4 +1,4 @@
-package flavor
+package flavor // import "github.com/docker/infrakit/pkg/cli/v0/flavor"
 
 import (
 	"github.com/docker/infrakit/pkg/cli"

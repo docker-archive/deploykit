@@ -1,4 +1,4 @@
-package log
+package log // import "github.com/docker/infrakit/pkg/log"
 
 import (
 	"flag"

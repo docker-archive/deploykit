@@ -1,4 +1,4 @@
-package api
+package api // import "github.com/docker/infrakit/pkg/provider/oracle/client/api"
 
 import (
 	"crypto/rsa"

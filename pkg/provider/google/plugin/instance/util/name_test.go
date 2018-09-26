@@ -1,4 +1,4 @@
-package util
+package util // import "github.com/docker/infrakit/pkg/provider/google/plugin/instance/util"
 
 import (
 	"testing"

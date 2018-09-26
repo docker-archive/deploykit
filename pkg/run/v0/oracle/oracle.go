@@ -1,4 +1,4 @@
-package oracle
+package oracle // import "github.com/docker/infrakit/pkg/run/v0/oracle"
 
 import (
 	"strings"

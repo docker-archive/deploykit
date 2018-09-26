@@ -1,4 +1,4 @@
-package ucs
+package ucs // import "github.com/docker/infrakit/pkg/provider/ucs"
 
 import (
 	"fmt"

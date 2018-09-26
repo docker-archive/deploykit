@@ -1,4 +1,4 @@
-package event
+package event // import "github.com/docker/infrakit/pkg/spi/event"
 
 import (
 	"testing"

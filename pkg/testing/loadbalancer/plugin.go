@@ -1,4 +1,4 @@
-package loadbalancer
+package loadbalancer // import "github.com/docker/infrakit/pkg/testing/loadbalancer"
 
 import (
 	"github.com/docker/infrakit/pkg/spi/instance"

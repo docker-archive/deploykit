@@ -1,4 +1,4 @@
-package mock
+package mock // import "github.com/docker/infrakit/pkg/provider/google/mock"
 
 //go:generate mockgen -package gcloud -destination gcloud/api.go github.com/docker/infrakit/pkg/provider/google/plugin/gcloud API
 //go:generate mockgen -package gcloud -destination gcloud/apiMetadata.go github.com/docker/infrakit/pkg/provider/google/plugin/gcloud APIMetadata

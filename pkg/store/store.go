@@ -1,4 +1,4 @@
-package store
+package store // import "github.com/docker/infrakit/pkg/store"
 
 import (
 	"io"

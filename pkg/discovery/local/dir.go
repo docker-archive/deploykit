@@ -1,4 +1,4 @@
-package local
+package local // import "github.com/docker/infrakit/pkg/discovery/local"
 
 import (
 	"io/ioutil"

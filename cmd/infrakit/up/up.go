@@ -1,4 +1,4 @@
-package up
+package up // import "github.com/docker/infrakit/cmd/infrakit/up"
 
 import (
 	"fmt"

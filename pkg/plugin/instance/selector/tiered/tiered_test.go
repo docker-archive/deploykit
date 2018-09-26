@@ -1,4 +1,4 @@
-package tiered
+package tiered // import "github.com/docker/infrakit/pkg/plugin/instance/selector/tiered"
 
 import (
 	"fmt"

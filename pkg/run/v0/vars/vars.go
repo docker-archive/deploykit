@@ -1,4 +1,4 @@
-package vars
+package vars // import "github.com/docker/infrakit/pkg/run/v0/vars"
 
 import (
 	"github.com/docker/infrakit/pkg/launch/inproc"

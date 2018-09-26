@@ -1,4 +1,4 @@
-package docker
+package docker // import "github.com/docker/infrakit/pkg/util/docker"
 
 import (
 	"crypto/tls"

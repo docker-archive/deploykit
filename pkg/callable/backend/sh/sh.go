@@ -1,4 +1,4 @@
-package sh
+package sh // import "github.com/docker/infrakit/pkg/callable/backend/sh"
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package v0
+package v0 // import "github.com/docker/infrakit/pkg/cli/v0"
 
 import (
 	"encoding/json"

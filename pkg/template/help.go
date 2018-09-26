@@ -1,4 +1,4 @@
-package template
+package template // import "github.com/docker/infrakit/pkg/template"
 
 import (
 	"fmt"

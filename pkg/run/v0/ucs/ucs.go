@@ -1,4 +1,4 @@
-package ucs
+package ucs // import "github.com/docker/infrakit/pkg/run/v0/ucs"
 
 import (
 	"strings"

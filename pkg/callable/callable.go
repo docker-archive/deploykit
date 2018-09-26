@@ -1,4 +1,4 @@
-package callable
+package callable // import "github.com/docker/infrakit/pkg/callable"
 
 import (
 	"bufio"

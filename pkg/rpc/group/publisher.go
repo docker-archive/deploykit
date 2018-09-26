@@ -1,4 +1,4 @@
-package group
+package group // import "github.com/docker/infrakit/pkg/rpc/group"
 
 import (
 	"github.com/docker/infrakit/pkg/spi/event"

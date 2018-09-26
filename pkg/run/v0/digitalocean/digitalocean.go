@@ -1,4 +1,4 @@
-package digitalocean
+package digitalocean // import "github.com/docker/infrakit/pkg/run/v0/digitalocean"
 
 import (
 	"context"

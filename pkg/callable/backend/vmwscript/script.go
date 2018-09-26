@@ -1,4 +1,4 @@
-package vmwscript
+package vmwscript // import "github.com/docker/infrakit/pkg/callable/backend/vmwscript"
 
 import (
 	"context"

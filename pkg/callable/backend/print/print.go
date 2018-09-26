@@ -1,4 +1,4 @@
-package print
+package print // import "github.com/docker/infrakit/pkg/callable/backend/print"
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/infrakit/pkg/rpc/client"
 
 import (
 	"testing"

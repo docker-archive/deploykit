@@ -1,4 +1,4 @@
-package inventory
+package inventory // import "github.com/docker/infrakit/pkg/run/v0/inventory"
 
 import (
 	"github.com/docker/infrakit/pkg/controller/inventory"

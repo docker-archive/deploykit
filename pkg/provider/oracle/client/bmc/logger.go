@@ -1,4 +1,4 @@
-package bmc
+package bmc // import "github.com/docker/infrakit/pkg/provider/oracle/client/bmc"
 
 const (
 	// LogOff states that no logging should be performed by the SDK. This is the

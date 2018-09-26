@@ -1,4 +1,4 @@
-package mux
+package mux // import "github.com/docker/infrakit/cmd/infrakit/util/mux"
 
 import (
 	"github.com/docker/go-connections/tlsconfig"

@@ -1,4 +1,4 @@
-package manager
+package manager // import "github.com/docker/infrakit/pkg/run/manager"
 
 import (
 	"io/ioutil"

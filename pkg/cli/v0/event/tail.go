@@ -1,4 +1,4 @@
-package event
+package event // import "github.com/docker/infrakit/pkg/cli/v0/event"
 
 import (
 	"fmt"

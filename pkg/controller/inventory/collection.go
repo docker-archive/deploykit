@@ -1,4 +1,4 @@
-package inventory
+package inventory // import "github.com/docker/infrakit/pkg/controller/inventory"
 
 import (
 	"context"

@@ -1,4 +1,4 @@
-package image
+package image // import "github.com/docker/infrakit/pkg/plugin/instance/image"
 
 import (
 	"bytes"

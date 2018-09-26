@@ -1,4 +1,4 @@
-package kubernetes
+package kubernetes // import "github.com/docker/infrakit/pkg/run/v0/kubernetes"
 
 import (
 	"os"

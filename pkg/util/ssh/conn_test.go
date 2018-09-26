@@ -1,4 +1,4 @@
-package ssh
+package ssh // import "github.com/docker/infrakit/pkg/util/ssh"
 
 import (
 	"bytes"

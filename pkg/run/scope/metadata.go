@@ -1,4 +1,4 @@
-package scope
+package scope // import "github.com/docker/infrakit/pkg/run/scope"
 
 import (
 	"fmt"

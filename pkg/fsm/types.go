@@ -1,4 +1,4 @@
-package fsm
+package fsm // import "github.com/docker/infrakit/pkg/fsm"
 
 // ID is the id of the instance in a given set.  It's unique in that set.
 type ID uint64

@@ -1,4 +1,4 @@
-package remoteboot
+package remoteboot // import "github.com/docker/infrakit/pkg/x/remoteboot"
 
 import (
 	"testing"

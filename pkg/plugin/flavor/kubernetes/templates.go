@@ -1,4 +1,4 @@
-package kubernetes
+package kubernetes // import "github.com/docker/infrakit/pkg/plugin/flavor/kubernetes"
 
 const (
 	// DefaultManagerInitScriptTemplate is the default template for the init script which

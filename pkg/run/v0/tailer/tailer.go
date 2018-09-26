@@ -1,4 +1,4 @@
-package tailer
+package tailer // import "github.com/docker/infrakit/pkg/run/v0/tailer"
 
 import (
 	"path/filepath"

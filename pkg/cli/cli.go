@@ -1,4 +1,4 @@
-package cli
+package cli // import "github.com/docker/infrakit/pkg/cli"
 
 import (
 	"github.com/spf13/cobra"

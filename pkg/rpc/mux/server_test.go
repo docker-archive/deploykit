@@ -1,4 +1,4 @@
-package mux
+package mux // import "github.com/docker/infrakit/pkg/rpc/mux"
 
 import (
 	"io/ioutil"

@@ -1,4 +1,4 @@
-package metadata
+package metadata // import "github.com/docker/infrakit/pkg/cli/v0/metadata"
 
 import (
 	"os"

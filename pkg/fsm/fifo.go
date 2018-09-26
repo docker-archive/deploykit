@@ -1,4 +1,4 @@
-package fsm
+package fsm // import "github.com/docker/infrakit/pkg/fsm"
 
 func newFifo(size int) *fifo {
 	return &fifo{

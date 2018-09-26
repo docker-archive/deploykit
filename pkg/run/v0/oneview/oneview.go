@@ -1,4 +1,4 @@
-package oneview
+package oneview // import "github.com/docker/infrakit/pkg/run/v0/oneview"
 
 import (
 	"strconv"

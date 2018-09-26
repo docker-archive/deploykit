@@ -1,4 +1,4 @@
-package fsm
+package fsm // import "github.com/docker/infrakit/pkg/fsm"
 
 import (
 	logutil "github.com/docker/infrakit/pkg/log"

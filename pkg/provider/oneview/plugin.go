@@ -1,4 +1,4 @@
-package oneview
+package oneview // import "github.com/docker/infrakit/pkg/provider/oneview"
 
 import (
 	"fmt"

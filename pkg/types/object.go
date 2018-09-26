@@ -1,4 +1,4 @@
-package types
+package types // import "github.com/docker/infrakit/pkg/types"
 
 // Object is an instance or realization of the Spec.  It has Spec as the desired attributes, as well as,
 // the instance identifier (ID), and State, which represents the current snapshot of the object instance.

@@ -1,4 +1,4 @@
-package spread
+package spread // import "github.com/docker/infrakit/pkg/plugin/instance/selector/spread"
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"

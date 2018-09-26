@@ -1,4 +1,4 @@
-package backend
+package backend // import "github.com/docker/infrakit/pkg/callable/backend"
 
 import (
 	"context"

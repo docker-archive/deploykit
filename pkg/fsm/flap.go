@@ -1,4 +1,4 @@
-package fsm
+package fsm // import "github.com/docker/infrakit/pkg/fsm"
 
 // Flap is oscillation between two adjacent states.  For example, a->b followed by b->a is
 // counted as 1 flap.  Similarly, b->a followed by a->b is another flap.

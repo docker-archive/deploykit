@@ -1,4 +1,4 @@
-package remote
+package remote // import "github.com/docker/infrakit/pkg/discovery/remote"
 
 import (
 	"net/http"

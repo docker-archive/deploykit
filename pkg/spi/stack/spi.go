@@ -1,4 +1,4 @@
-package stack
+package stack // import "github.com/docker/infrakit/pkg/spi/stack"
 
 import (
 	"net/url"

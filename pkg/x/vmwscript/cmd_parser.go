@@ -1,4 +1,4 @@
-package vmwscript
+package vmwscript // import "github.com/docker/infrakit/pkg/x/vmwscript"
 
 import (
 	"fmt"

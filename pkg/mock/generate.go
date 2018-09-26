@@ -1,4 +1,4 @@
-package mock
+package mock // import "github.com/docker/infrakit/pkg/mock"
 
 //go:generate mockgen -package instance -destination spi/instance/instance.go github.com/docker/infrakit/pkg/spi/instance Plugin
 //go:generate mockgen -package flavor -destination spi/flavor/flavor.go github.com/docker/infrakit/pkg/spi/flavor Plugin

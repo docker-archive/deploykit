@@ -1,4 +1,4 @@
-package local
+package local // import "github.com/docker/infrakit/pkg/run/scope/local"
 
 import (
 	group_types "github.com/docker/infrakit/pkg/controller/group/types"

@@ -1,4 +1,4 @@
-package manager
+package manager // import "github.com/docker/infrakit/cmd/infrakit/manager"
 
 import (
 	"fmt"

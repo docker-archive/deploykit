@@ -1,4 +1,4 @@
-package base
+package base // import "github.com/docker/infrakit/cmd/infrakit/base"
 
 import (
 	"sync"

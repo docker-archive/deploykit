@@ -1,4 +1,4 @@
-package os
+package os // import "github.com/docker/infrakit/pkg/launch/os"
 
 import (
 	"sync"

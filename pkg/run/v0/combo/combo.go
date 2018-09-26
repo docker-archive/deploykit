@@ -1,4 +1,4 @@
-package combo
+package combo // import "github.com/docker/infrakit/pkg/run/v0/combo"
 
 import (
 	"github.com/docker/infrakit/pkg/launch/inproc"

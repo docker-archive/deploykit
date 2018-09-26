@@ -1,4 +1,4 @@
-package image
+package image // import "github.com/docker/infrakit/pkg/run/v0/image"
 
 import (
 	"strings"

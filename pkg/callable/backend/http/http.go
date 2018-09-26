@@ -1,4 +1,4 @@
-package http
+package http // import "github.com/docker/infrakit/pkg/callable/backend/http"
 
 import (
 	"bytes"

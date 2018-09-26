@@ -1,4 +1,4 @@
-package types
+package types // import "github.com/docker/infrakit/pkg/types"
 
 // Hierarchical is the interface for any hierarchical, tree-like structures
 type Hierarchical interface {

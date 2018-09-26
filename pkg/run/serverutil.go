@@ -1,4 +1,4 @@
-package run
+package run // import "github.com/docker/infrakit/pkg/run"
 
 import (
 	"fmt"

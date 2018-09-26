@@ -1,4 +1,4 @@
-package gc
+package gc // import "github.com/docker/infrakit/pkg/controller/gc"
 
 import (
 	"fmt"

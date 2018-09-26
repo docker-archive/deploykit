@@ -1,4 +1,4 @@
-package server
+package server // import "github.com/docker/infrakit/pkg/broker/server"
 
 import (
 	"bytes"

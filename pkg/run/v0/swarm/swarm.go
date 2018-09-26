@@ -1,4 +1,4 @@
-package swarm
+package swarm // import "github.com/docker/infrakit/pkg/run/v0/swarm"
 
 import (
 	"github.com/docker/infrakit/pkg/launch/inproc"

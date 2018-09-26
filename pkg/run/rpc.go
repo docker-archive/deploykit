@@ -1,4 +1,4 @@
-package run
+package run // import "github.com/docker/infrakit/pkg/run"
 
 // TODO -- this needs to be versioned because all the interface / spi packages are versioned.
 

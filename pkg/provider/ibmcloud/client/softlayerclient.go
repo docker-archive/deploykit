@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/infrakit/pkg/provider/ibmcloud/client"
 
 import (
 	"github.com/softlayer/softlayer-go/datatypes"

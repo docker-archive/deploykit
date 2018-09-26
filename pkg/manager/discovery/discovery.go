@@ -1,4 +1,4 @@
-package discovery
+package discovery // import "github.com/docker/infrakit/pkg/manager/discovery"
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"
