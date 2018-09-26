@@ -1,0 +1,20 @@
+{{/* Input to create instance using the AWS instance plugin */}}
+{{/* =% instanceProvision `aws/vpc` %= */}}
+
+{{ $project := param "project" "string" "project" | prompt "Project?" "string" "myproject" }}
+
+{{ $cidr := param "cidr" "string" "CIDR Block" | prompt "CIDR block?" "string" "10.0.0.0/16" }}
+
+Tags:
+  infrakit_scope: {{ $project }}
+
+Properties:
+  Tags:
+    Name: {{ $project }}-vpc
+  CreateVpcInput:
+    CidrBlock: {{ $cidr }}
+  ModifyVpcAttributeInputs:
+    - EnableDnsSupport :
+        Value: true
+    - EnableDnsHostnames :
+        Value: true

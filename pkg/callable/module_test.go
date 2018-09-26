@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"strings"
 	"sync"
 	"testing"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/docker/infrakit/pkg/discovery"
 	"github.com/docker/infrakit/pkg/discovery/local"
 	"github.com/docker/infrakit/pkg/run/scope"
+	"github.com/docker/infrakit/pkg/types"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/docker/infrakit/pkg/callable/backend/sh"
@@ -63,6 +65,89 @@ func linesFunc(t *testing.T, wg *sync.WaitGroup, c *Callable, header string, cou
 
 }
 
+func TestModuleSubs(t *testing.T) {
+
+	var defaultOutput bytes.Buffer
+
+	printOnly := true
+
+	module := Module{
+		Scope:    testScope("testModule"),
+		IndexURL: "file://" + path.Join(dir(), "test/index.yml"),
+		ParametersFunc: func() backend.Parameters {
+			return &Parameters{}
+		},
+		Options: Options{
+			OutputFunc:    func() io.Writer { return &defaultOutput },
+			ErrOutputFunc: func() io.Writer { return os.Stderr },
+			PrintOnly:     &printOnly,
+		},
+	}
+
+	err := module.Load()
+	require.NoError(t, err)
+
+	start, err := module.GetCallable("start")
+	require.NoError(t, err)
+	require.NotNil(t, start)
+
+	vpc, err := module.GetCallable("vpc")
+	require.NoError(t, err)
+	require.NotNil(t, vpc)
+
+	vpc.SetParameter("project", "foo")
+	vpc.SetParameter("cidr", "10.10.10.100/16")
+	err = vpc.Execute(context.Background(), nil, nil)
+	require.NoError(t, err)
+
+	var parsed interface{}
+	require.NoError(t, types.Decode(defaultOutput.Bytes(), &parsed))
+	require.Equal(t, "foo-vpc", types.Get(types.PathFromString("Properties/Tags/Name"), parsed))
+	require.Equal(t, "10.10.10.100/16", types.Get(types.PathFromString("Properties/CreateVpcInput/CidrBlock"), parsed))
+
+	sub, err := module.GetModule("sub")
+	require.NoError(t, err)
+	require.NotNil(t, sub)
+
+	vpc2, err := sub.GetCallable("provision_vpc")
+	require.NoError(t, err)
+	require.NotNil(t, vpc2)
+	vpc2.SetParameter("project", "bar")
+	vpc2.SetParameter("cidr", "10.20.10.100/16")
+	err = vpc2.Execute(context.Background(), nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, types.Decode(defaultOutput.Bytes(), &parsed))
+	require.Equal(t, "bar-vpc", types.Get(types.PathFromString("Properties/Tags/Name"), parsed))
+	require.Equal(t, "10.20.10.100/16", types.Get(types.PathFromString("Properties/CreateVpcInput/CidrBlock"), parsed))
+
+	vpc3, err := module.Find(strings.Split("sub.provision_vpc", "."))
+	require.NoError(t, err)
+	require.NotNil(t, vpc3)
+	vpc3.SetParameter("project", "baz")
+	vpc3.SetParameter("cidr", "10.30.10.100/16")
+	err = vpc3.Execute(context.Background(), nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, types.Decode(defaultOutput.Bytes(), &parsed))
+	require.Equal(t, "baz-vpc", types.Get(types.PathFromString("Properties/Tags/Name"), parsed))
+	require.Equal(t, "10.30.10.100/16", types.Get(types.PathFromString("Properties/CreateVpcInput/CidrBlock"), parsed))
+
+	subnet, err := module.Find(strings.Split("sub.sub2.provision_subnet", "."))
+	require.NoError(t, err)
+	require.NotNil(t, subnet)
+	subnet.SetParameter("project", "baz")
+	subnet.SetParameter("vpcID", "vpc1234")
+	subnet.SetParameter("routeTableID", "rt1234")
+	subnet.SetParameter("name", "mysubnet")
+	subnet.SetParameter("az", "us-east-1")
+	subnet.SetParameter("cidr", "10.30.10.100/16")
+	subnet.SetParameter("code", 42)
+	err = subnet.Execute(context.Background(), nil, nil)
+	require.NoError(t, err)
+	require.NoError(t, types.Decode(defaultOutput.Bytes(), &parsed))
+	require.Equal(t, float64(42), types.Get(types.PathFromString("Tags/special_code"), parsed))
+	require.Equal(t, "us-east-1", types.Get(types.PathFromString("Properties/CreateSubnetInput/AvailabilityZone"), parsed))
+}
+
 func TestModule(t *testing.T) {
 
 	var defaultOutput bytes.Buffer
@@ -95,7 +180,7 @@ func TestModule(t *testing.T) {
 	require.NotNil(t, spot)
 
 	names := module.List()
-	require.Equal(t, []string{"lines", "ondemand", "spot", "start"}, names)
+	require.Equal(t, []string{"lines", "ondemand", "spot", "start", "vpc"}, names)
 
 	lines, err := module.GetCallable("lines")
 	require.NoError(t, err)

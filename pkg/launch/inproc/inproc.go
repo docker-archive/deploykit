@@ -113,7 +113,7 @@ type state struct {
 	wait      <-chan error
 }
 
-// Launcher is a service that implements the launch.Exec interface for starting up os processes.
+// Launcher is a service that implements the launch.Exec interface for starting up the plugin in process.
 type Launcher struct {
 	name    string
 	running map[string]state
