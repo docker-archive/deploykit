@@ -1,6 +1,6 @@
 // +build linux darwin freebsd netbsd openbsd
 
-package os
+package os // import "github.com/docker/infrakit/pkg/launch/os"
 
 import (
 	"os/exec"

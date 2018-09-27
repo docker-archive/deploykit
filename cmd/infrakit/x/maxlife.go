@@ -1,4 +1,4 @@
-package x
+package x // import "github.com/docker/infrakit/cmd/infrakit/x"
 
 import (
 	"os"

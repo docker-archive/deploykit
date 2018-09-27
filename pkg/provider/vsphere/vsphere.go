@@ -1,4 +1,4 @@
-package vsphere
+package vsphere // import "github.com/docker/infrakit/pkg/provider/vsphere"
 
 import (
 	"context"

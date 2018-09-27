@@ -1,4 +1,4 @@
-package exec
+package exec // import "github.com/docker/infrakit/pkg/util/exec"
 
 import (
 	"fmt"

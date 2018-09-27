@@ -1,4 +1,4 @@
-package client
+package client // import "github.com/docker/infrakit/pkg/rpc/client"
 
 // Client allows execution of RPCs.
 type Client interface {

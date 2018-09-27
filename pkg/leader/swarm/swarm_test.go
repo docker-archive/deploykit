@@ -1,4 +1,4 @@
-package swarm
+package swarm // import "github.com/docker/infrakit/pkg/leader/swarm"
 
 import (
 	"net/url"

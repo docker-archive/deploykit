@@ -1,4 +1,4 @@
-package google
+package google // import "github.com/docker/infrakit/pkg/run/v0/google"
 
 import (
 	"strings"

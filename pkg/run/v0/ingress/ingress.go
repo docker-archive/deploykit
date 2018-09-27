@@ -1,4 +1,4 @@
-package ingress
+package ingress // import "github.com/docker/infrakit/pkg/run/v0/ingress"
 
 import (
 	"github.com/docker/infrakit/pkg/controller/ingress"

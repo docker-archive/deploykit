@@ -1,4 +1,4 @@
-package mem
+package mem // import "github.com/docker/infrakit/pkg/store/mem"
 
 import (
 	"fmt"

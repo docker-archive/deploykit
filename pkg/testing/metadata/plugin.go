@@ -1,4 +1,4 @@
-package metadata
+package metadata // import "github.com/docker/infrakit/pkg/testing/metadata"
 
 import (
 	"github.com/docker/infrakit/pkg/spi/metadata"

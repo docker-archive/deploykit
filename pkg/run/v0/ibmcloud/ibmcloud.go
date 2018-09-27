@@ -1,4 +1,4 @@
-package ibmcloud
+package ibmcloud // import "github.com/docker/infrakit/pkg/run/v0/ibmcloud"
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package combo
+package combo // import "github.com/docker/infrakit/pkg/plugin/flavor/combo"
 
 import (
 	"testing"

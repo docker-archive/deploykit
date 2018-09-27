@@ -1,4 +1,4 @@
-package controller
+package controller // import "github.com/docker/infrakit/pkg/callable/backend/controller"
 
 import (
 	"context"

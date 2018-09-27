@@ -1,4 +1,4 @@
-package flavor
+package flavor // import "github.com/docker/infrakit/pkg/provider/google/plugin/flavor"
 
 import (
 	"errors"

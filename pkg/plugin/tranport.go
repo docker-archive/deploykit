@@ -1,4 +1,4 @@
-package plugin
+package plugin // import "github.com/docker/infrakit/pkg/plugin"
 
 // Transport describes how the plugin communicates
 type Transport struct {

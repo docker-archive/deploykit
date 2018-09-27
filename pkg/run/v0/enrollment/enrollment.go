@@ -1,4 +1,4 @@
-package enrollment
+package enrollment // import "github.com/docker/infrakit/pkg/run/v0/enrollment"
 
 import (
 	"strconv"

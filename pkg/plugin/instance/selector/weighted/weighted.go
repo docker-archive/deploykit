@@ -1,4 +1,4 @@
-package weighted
+package weighted // import "github.com/docker/infrakit/pkg/plugin/instance/selector/weighted"
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package vagrant
+package vagrant // import "github.com/docker/infrakit/pkg/run/v0/vagrant"
 
 import (
 	"os"

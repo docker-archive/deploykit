@@ -1,4 +1,4 @@
-package libvirt
+package libvirt // import "github.com/docker/infrakit/pkg/run/v0/libvirt"
 
 import (
 	"strings"

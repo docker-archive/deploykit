@@ -1,4 +1,4 @@
-package group
+package group // import "github.com/docker/infrakit/pkg/testing/group"
 
 import (
 	"github.com/docker/infrakit/pkg/spi/group"

@@ -1,4 +1,4 @@
-package spi
+package spi // import "github.com/docker/infrakit/pkg/spi"
 
 import (
 	"github.com/docker/infrakit/pkg/types"

@@ -27,7 +27,7 @@ endif
 .DEFAULT: all
 all: clean fmt vet lint build test binaries
 
-ci: fmt vet lint check-docs coverage
+ci: fmt vet lint coverage
 
 AUTHORS: .mailmap .git/HEAD
 	git log --format='%aN <%aE>' | sort -fu > $@

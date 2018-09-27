@@ -1,4 +1,4 @@
-package tailer
+package tailer // import "github.com/docker/infrakit/pkg/plugin/event/tailer"
 
 import (
 	"fmt"

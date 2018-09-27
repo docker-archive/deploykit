@@ -1,4 +1,4 @@
-package bootstrap
+package bootstrap // import "github.com/docker/infrakit/pkg/provider/aws/experimental/bootstrap"
 
 import (
 	"encoding/json"

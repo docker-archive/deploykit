@@ -1,4 +1,4 @@
-package server
+package server // import "github.com/docker/infrakit/pkg/rpc/server"
 
 import (
 	"io/ioutil"

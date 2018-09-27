@@ -1,4 +1,4 @@
-package inproc
+package inproc // import "github.com/docker/infrakit/pkg/launch/inproc"
 
 import (
 	"fmt"

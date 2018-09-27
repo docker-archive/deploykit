@@ -1,4 +1,4 @@
-package vanilla
+package vanilla // import "github.com/docker/infrakit/pkg/plugin/flavor/vanilla"
 
 import (
 	"fmt"

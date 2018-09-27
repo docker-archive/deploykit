@@ -1,4 +1,4 @@
-package resource
+package resource // import "github.com/docker/infrakit/pkg/spi/resource"
 
 import (
 	"github.com/docker/infrakit/pkg/spi"

@@ -1,4 +1,4 @@
-package rpc
+package rpc // import "github.com/docker/infrakit/pkg/rpc"
 
 import (
 	"testing"

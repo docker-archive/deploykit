@@ -1,4 +1,4 @@
-package kubernetes
+package kubernetes // import "github.com/docker/infrakit/pkg/plugin/flavor/kubernetes"
 
 import (
 	"github.com/docker/infrakit/pkg/discovery"

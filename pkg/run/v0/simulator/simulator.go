@@ -1,4 +1,4 @@
-package simulator
+package simulator // import "github.com/docker/infrakit/pkg/run/v0/simulator"
 
 import (
 	"path/filepath"

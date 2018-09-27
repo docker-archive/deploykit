@@ -1,4 +1,4 @@
-package loadbalancer
+package loadbalancer // import "github.com/docker/infrakit/pkg/provider/oracle/client/loadbalancer"
 
 import (
 	"encoding/json"

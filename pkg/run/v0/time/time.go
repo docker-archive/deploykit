@@ -1,4 +1,4 @@
-package time
+package time // import "github.com/docker/infrakit/pkg/run/v0/time"
 
 import (
 	"time"

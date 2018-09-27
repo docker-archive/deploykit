@@ -1,4 +1,4 @@
-package flavor
+package flavor // import "github.com/docker/infrakit/pkg/spi/flavor"
 
 import (
 	"github.com/docker/infrakit/pkg/spi"

@@ -1,4 +1,4 @@
-package leader
+package leader // import "github.com/docker/infrakit/pkg/leader"
 
 import (
 	"net/url"

@@ -1,4 +1,4 @@
-package metadata
+package metadata // import "github.com/docker/infrakit/pkg/rpc/metadata"
 
 import (
 	logutil "github.com/docker/infrakit/pkg/log"

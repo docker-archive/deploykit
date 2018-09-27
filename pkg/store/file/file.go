@@ -1,4 +1,4 @@
-package file
+package file // import "github.com/docker/infrakit/pkg/store/file"
 
 import (
 	"encoding/json"

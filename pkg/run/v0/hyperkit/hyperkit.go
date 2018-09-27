@@ -1,4 +1,4 @@
-package hyperkit
+package hyperkit // import "github.com/docker/infrakit/pkg/run/v0/hyperkit"
 
 import (
 	"path/filepath"

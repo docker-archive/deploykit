@@ -1,4 +1,4 @@
-package swarm
+package swarm // import "github.com/docker/infrakit/pkg/plugin/flavor/swarm"
 
 const (
 	// DefaultManagerInitScriptTemplate is the default template for the init script which

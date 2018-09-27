@@ -1,4 +1,4 @@
-package vsphere
+package vsphere // import "github.com/docker/infrakit/pkg/run/v0/vsphere"
 
 import (
 	"strings"

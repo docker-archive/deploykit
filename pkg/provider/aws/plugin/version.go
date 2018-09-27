@@ -1,4 +1,4 @@
-package plugin
+package plugin // import "github.com/docker/infrakit/pkg/provider/aws/plugin"
 
 import (
 	"fmt"

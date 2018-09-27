@@ -1,4 +1,4 @@
-package gcp
+package gcp // import "github.com/docker/infrakit/pkg/plugin/instance/image/gcp"
 
 import (
 	"crypto/rand"

@@ -1,4 +1,4 @@
-package controller
+package controller // import "github.com/docker/infrakit/pkg/testing/controller"
 
 import (
 	"github.com/docker/infrakit/pkg/spi/controller"

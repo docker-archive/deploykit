@@ -1,4 +1,4 @@
-package group
+package group // import "github.com/docker/infrakit/pkg/controller/group"
 
 import (
 	"sort"

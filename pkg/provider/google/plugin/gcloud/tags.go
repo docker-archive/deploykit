@@ -1,4 +1,4 @@
-package gcloud
+package gcloud // import "github.com/docker/infrakit/pkg/provider/google/plugin/gcloud"
 
 import (
 	"sort"

@@ -1,4 +1,4 @@
-package manager
+package manager // import "github.com/docker/infrakit/pkg/manager"
 
 import (
 	metadata_plugin "github.com/docker/infrakit/pkg/plugin/metadata"

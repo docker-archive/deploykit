@@ -1,4 +1,4 @@
-package vanilla
+package vanilla // import "github.com/docker/infrakit/pkg/run/v0/vanilla"
 
 import (
 	"github.com/docker/infrakit/pkg/launch/inproc"

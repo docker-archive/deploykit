@@ -1,4 +1,4 @@
-package maxlife
+package maxlife // import "github.com/docker/infrakit/pkg/x/maxlife"
 
 import (
 	"fmt"

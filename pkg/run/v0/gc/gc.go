@@ -1,4 +1,4 @@
-package gc
+package gc // import "github.com/docker/infrakit/pkg/run/v0/gc"
 
 import (
 	"github.com/docker/infrakit/pkg/controller/gc"

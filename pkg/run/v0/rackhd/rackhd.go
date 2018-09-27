@@ -1,4 +1,4 @@
-package rackhd
+package rackhd // import "github.com/docker/infrakit/pkg/run/v0/rackhd"
 
 import (
 	"github.com/docker/infrakit/pkg/launch/inproc"

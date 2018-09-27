@@ -1,4 +1,4 @@
-package selector
+package selector // import "github.com/docker/infrakit/pkg/run/v0/selector"
 
 import (
 	"strconv"

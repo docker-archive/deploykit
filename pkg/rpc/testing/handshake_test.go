@@ -1,4 +1,4 @@
-package testing
+package testing // import "github.com/docker/infrakit/pkg/rpc/testing"
 
 import (
 	"io/ioutil"

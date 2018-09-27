@@ -1,4 +1,4 @@
-package resource
+package resource // import "github.com/docker/infrakit/pkg/cli/v0/resource"
 
 import (
 	"os"

@@ -1,4 +1,4 @@
-package controller
+package controller // import "github.com/docker/infrakit/pkg/cli/v0/controller"
 
 import (
 	"github.com/docker/infrakit/pkg/cli"

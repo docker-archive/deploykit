@@ -1,4 +1,4 @@
-package packet
+package packet // import "github.com/docker/infrakit/pkg/run/v0/packet"
 
 import (
 	"strings"

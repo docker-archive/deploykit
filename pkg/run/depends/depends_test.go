@@ -1,4 +1,4 @@
-package depends
+package depends // import "github.com/docker/infrakit/pkg/run/depends"
 
 import (
 	"testing"

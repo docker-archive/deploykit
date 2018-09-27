@@ -1,4 +1,4 @@
-package init
+package init // import "github.com/docker/infrakit/cmd/infrakit/util/init"
 
 import (
 	"fmt"

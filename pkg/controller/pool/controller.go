@@ -1,4 +1,4 @@
-package pool
+package pool // import "github.com/docker/infrakit/pkg/controller/pool"
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package resource
+package resource // import "github.com/docker/infrakit/pkg/run/v0/resource"
 
 import (
 	"github.com/docker/infrakit/pkg/controller/resource"

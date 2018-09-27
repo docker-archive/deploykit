@@ -1,4 +1,4 @@
-package resource
+package resource // import "github.com/docker/infrakit/pkg/rpc/resource"
 
 import (
 	rpc_client "github.com/docker/infrakit/pkg/rpc/client"

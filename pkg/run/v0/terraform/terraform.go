@@ -1,4 +1,4 @@
-package terraform
+package terraform // import "github.com/docker/infrakit/pkg/run/v0/terraform"
 
 import (
 	"fmt"

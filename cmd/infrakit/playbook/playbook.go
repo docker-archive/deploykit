@@ -1,4 +1,4 @@
-package playbook
+package playbook // import "github.com/docker/infrakit/cmd/infrakit/playbook"
 
 import (
 	"fmt"

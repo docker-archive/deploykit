@@ -1,4 +1,4 @@
-package internal
+package internal // import "github.com/docker/infrakit/pkg/controller/internal"
 
 import (
 	"testing"

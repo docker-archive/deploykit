@@ -1,4 +1,4 @@
-package types
+package types // import "github.com/docker/infrakit/pkg/controller/group/types"
 
 import (
 	"crypto/sha1"

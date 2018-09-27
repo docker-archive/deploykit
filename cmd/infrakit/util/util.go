@@ -1,4 +1,4 @@
-package util
+package util // import "github.com/docker/infrakit/cmd/infrakit/util"
 
 import (
 	"github.com/docker/infrakit/cmd/infrakit/base"

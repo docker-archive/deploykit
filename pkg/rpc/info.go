@@ -1,4 +1,4 @@
-package rpc
+package rpc // import "github.com/docker/infrakit/pkg/rpc"
 
 const (
 	// URLAPI is the well-known HTTP GET endpoint that retrieves description of the plugin's interfaces.

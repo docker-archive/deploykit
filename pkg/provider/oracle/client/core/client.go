@@ -1,4 +1,4 @@
-package core
+package core // import "github.com/docker/infrakit/pkg/provider/oracle/client/core"
 
 import (
 	"fmt"

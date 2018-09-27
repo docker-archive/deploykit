@@ -1,4 +1,4 @@
-package maas
+package maas // import "github.com/docker/infrakit/pkg/run/v0/maas"
 
 import (
 	"fmt"

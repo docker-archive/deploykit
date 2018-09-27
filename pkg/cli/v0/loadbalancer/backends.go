@@ -1,4 +1,4 @@
-package loadbalancer
+package loadbalancer // import "github.com/docker/infrakit/pkg/cli/v0/loadbalancer"
 
 import (
 	"fmt"

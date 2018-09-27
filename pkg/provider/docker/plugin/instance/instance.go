@@ -1,4 +1,4 @@
-package instance
+package instance // import "github.com/docker/infrakit/pkg/provider/docker/plugin/instance"
 
 import (
 	"bytes"

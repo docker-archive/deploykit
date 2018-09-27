@@ -1,4 +1,4 @@
-package schema
+package schema // import "github.com/docker/infrakit/cmd/infrakit/manager/schema"
 
 import (
 	group_types "github.com/docker/infrakit/pkg/controller/group/types"

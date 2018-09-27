@@ -1,4 +1,4 @@
-package launch
+package launch // import "github.com/docker/infrakit/pkg/launch"
 
 import (
 	"github.com/docker/infrakit/pkg/plugin"
