@@ -25,13 +25,12 @@ a local file via the `file://` scheme in the URL.
 
 Now verify:
 ```shell
-$ infrakit playbook linuxkit -h
+$ infrakit use linuxkit -h
 
-
-linuxkit
+[this file]
 
 Usage:
-  infrakit playbook linuxkit [command]
+  infrakit use linuxkit [command]
 
 Available Commands:
   demo-sshd        demo-sshd
@@ -42,6 +41,10 @@ Available Commands:
   run-packet       run-packet
   start            start
   stop             stop
+  
+[Global Flags]
+
+Use "infrakit use linuxkit [command] --help" for more information about a command.
 ```
 
 This playbook assumes you're running on a Mac, using Docker for Mac as the runtime for running the InfraKit plugins.
