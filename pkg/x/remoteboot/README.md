@@ -9,7 +9,7 @@ Follow the majority of steps on the [InfraKit github repository](http://github.c
 
 ## Usage:
 
-The remoteboot function requires **root** priviliges in order to be used, which is due to:
+The remoteboot function requires **root** privileges in order to be used, which is due to:
 - UDP Ports in the < 1024 range (67 DHCP, 69 TFTP)
 - TCP Port 80 HTTP (No HTTPS)
 - Binding to an adapter in order to broadcast

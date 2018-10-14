@@ -35,8 +35,8 @@ This allows end-users to drag runnning VMs from the folder for other use cases (
 - Use of Folders and VM annotations to track InfraKit VMs
 - Provisioning, Scaling and Destroying
 - Cloning of Virtual Machine Templates, to be used as the base image for new instances
-- Building of new VM instances around LinuxKist `.iso` files that are uploades through the `$ linuxkit push vcenter <args> file.iso` command.
-- Capability to identify VM guest IP address settings throught the `infrakit group describe <groupID>`
+- Building of new VM instances around LinuxKist `.iso` files that are uploads through the `$ linuxkit push vcenter <args> file.iso` command.
+- Capability to identify VM guest IP address settings through the `infrakit group describe <groupID>`
 - Can be used with a single vSphere Host, however Folders aren't supported so all VMs will end up as part of the root structure.
 
 ## Plugin Usage
@@ -48,7 +48,7 @@ This allows end-users to drag runnning VMs from the folder for other use cases (
 - `--datastore` or `VCDATASTORE` = Default Datastore used for new VM Instances
 - `--hostname` or `VCHOST` = Name of the main vSphere host that will be used
 
-**Note**: These may be depricated as they should be `commited` through the infrakit cli instead.
+**Note**: These may be depricated as they should be `committed` through the infrakit cli instead.
 
 ### Example JSON with a Template
 ```

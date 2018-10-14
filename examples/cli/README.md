@@ -5,7 +5,7 @@ Any subfolders here will be added as a command, as in any file with the `.ikc` e
 The directory tree will be followed recursively and commands will follow the hierarchy of
 the file system from the point set by the `INFRAKIT_CLI_DIR` environment variable.
 
-For example, if we point the enviroment variable to this directory, the folder `build` will show
+For example, if we point the environment variable to this directory, the folder `build` will show
 up as a command with child commands, while the file `CreateCluster.ikc` will show up as a command.
 
 
