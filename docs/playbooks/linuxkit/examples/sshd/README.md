@@ -46,7 +46,7 @@ infrakit instance-hyperkit describe
 There are other commands to try -- like starting up a cluster:
 
 ```
-infrakit playbook linuxkit demo-sshd hyperkit scale-group
+infrakit use linuxkit demo-sshd hyperkit scale-group
 ```
 
 A quick `describe` will show the new instances:
@@ -61,7 +61,7 @@ Try running `build-image` again, and this time use a different public key.
 Then run
 
 ```
-infrakit playbook linuxkit demo-sshd hyperkit scale-group
+infrakit use linuxkit demo-sshd hyperkit scale-group
 ```
 
 After you answer all the questions, you should notice that Infrakit will attempt a rolling update.
