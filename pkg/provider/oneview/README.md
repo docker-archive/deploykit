@@ -5,7 +5,7 @@ This is a Docker InfraKit Instance Plugin that is designed to automate the provi
 
 ## Architecture Overview
 
-The Instance plugin will take the configuration that is described in the group-default JSON configuration and commit the instance code to the plugin itself. The plugin then will communicate directly with OneView to assess the state of defined instances and act accordingly by (**creating**, **growing**, **healing**, **removing** or **destroying**) the instances. If numerous group configurations are commited, then the oneview plugin will manage all instances and will differentiate between instances and which group they belong too.
+The Instance plugin will take the configuration that is described in the group-default JSON configuration and commit the instance code to the plugin itself. The plugin then will communicate directly with OneView to assess the state of defined instances and act accordingly by (**creating**, **growing**, **healing**, **removing** or **destroying**) the instances. If numerous group configurations are committed, then the oneview plugin will manage all instances and will differentiate between instances and which group they belong too.
 
 ![OneView Architecture](http://thebsdbox.co.uk/wp-content/uploads/2016/11/InfraKit-Instance-oneview.jpeg)
 

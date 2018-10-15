@@ -270,7 +270,7 @@ $ infrakit simulator/compute provision -y ./single.yml
 
 The argument `./single.yml` is the path of local file, or a URL.  This makes it
 possible to reuse templated specs from Github or other sources.  The `-y` options
-tells Infrakit to interpet the input as YAML (because it accepts JSON by default).
+tells Infrakit to interpret the input as YAML (because it accepts JSON by default).
 
 Now list to see the instance:
 

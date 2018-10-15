@@ -2,7 +2,7 @@
 An example of [Infrakit](https://github.com/docker/infrakit) Instance Pluging for [Canonical MaaS](https://maas.io/) node.
 Purpose of this plugin is to support Bare metal deploy with Infrakit.
 
-## Preperation
+## Preparation
 Now this plugin need already setuped MaaS server and enlisted nodes.
 And all node should be `Ready` status.
 
@@ -15,7 +15,7 @@ Requires:
 * Needs ansible installed on host machine
 * MaaS Server
 * API Key ( See https://maas.ubuntu.com/docs/maascli.html )
-* MaaS Nodes (You need all node be `Ready` state. Register and commision manually.)
+* MaaS Nodes (You need all node be `Ready` state. Register and commission manually.)
 * Spec file ( example: maas-vanilla.yml )
 
 As this is only demo, we use virtual box. we should be use BareMetal Server Cluster with MaaS

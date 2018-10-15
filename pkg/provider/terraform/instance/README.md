@@ -180,7 +180,7 @@ INFO[0000] Listening at: ~/.infrakit/plugins/instance-terraform
 Be sure to verify that the plugin is [discoverable](/cmd/infrakit/README.md#list-plugins).
 
 Now lets try to validate something.  Instead of reading from stdin we are loading from a file
-to avoid problems with bad bash substitution beacuse Terrafrom configs use `$` to indicate variables.
+to avoid problems with bad bash substitution because Terrafrom configs use `$` to indicate variables.
 
 ```shell
 $ cat pkg/provider/terraform/instance/aws-two-tier/instance-plugin-properties.json
