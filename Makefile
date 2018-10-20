@@ -52,7 +52,7 @@ PKGS_TEST := $(shell echo $(PKGS_AND_MOCKS) | tr ' ' '\n' | grep pkg$)
 get-tools:
 	@echo "+ $@"
 	@go get -u \
-		github.com/golang/lint/golint \
+		golang.org/x/lint/golint \
 		github.com/wfarner/blockcheck \
 		github.com/golang/dep/cmd/dep
 
