@@ -1,0 +1,152 @@
+{{/*
+
+This is actually a template that renders to JSON.
+Here we demonstrate the use of local variables in the template (e.g. $url)
+and just fetch the information from the user either as command line flags or
+user input via prompts.
+
+*/}}
+
+{{/* =% vmwscript %= */}}{{/* directive to use the vmwscript engine */}}
+
+{{ $url := flag "vcenter-url" "string" "VCenter URL" | prompt "VCenter URL?" "string" "https://username@vsphere.local:password@vc.unifydc.io/sdk" }}
+{{ $dc := flag "data-center" "string" "Data Center name" | prompt "Data Center Name?" "string" "Datacenter" }}
+{{ $ds := flag "data-store" "string" "Data Store name" | prompt "Data Store Name?" "string" "datastore1" }}
+{{ $nn := flag "network-name" "string" "Network name" | prompt "Network Name?" "string" "Internal Network (NAT)" }}
+{{ $host := flag "vsphere-host" "string" "vSphere host" | prompt "Host Name?" "string" "esxi01.local" }}
+
+{{ $tmpl := flag "template" "string" "vSphere template" | prompt "Template?" "string" "Centos7-Template" }}
+
+
+{{ $user := flag "user" "string" "Username" | prompt "User Name?" "string" }}
+{{ $pass := flag "pass" "string" "Password" | prompt "Password?" "string" }}
+
+{
+    "label":"Kubernetes-on-CentOS",
+    "version":"0.1",
+    "vmconfig" : {
+	"vcenterURL" : "{{ $url }}",
+        "datacentre" : "{{ $dc }}",
+        "datastore":"{{ $ds }}",
+        "network" : "{{ $nn }}",
+        "host" : "{{ $host }}",
+        "guestCredentials" : {
+            "guestUser" : "{{ $user }}",
+            "guestPass" :"{{ $pass }}"
+        }
+    },
+    "deployment": [
+        {"name": "Kubernetes Template",
+         "note": "Build new template for CentOS",
+         "task":{
+            "inputTemplate": "{{ $tmpl }}",
+            "outputName": "KubeTemplate",
+            "outputType": "Template",
+            "import":"",
+            "commands": [
+                {
+                    "type":"execute",
+                    "note":"Remove TTY requirement for sudo (old RHEL issue)",
+                    "cmd":"sed -i -e 's/Defaults    requiretty.*/ #Defaults    requiretty/g' /etc/sudoers"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Disable SELINUX (FirewallD bug)",
+                    "cmd":"/usr/sbin/setenforce 0",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Remove Swap device from /etc/fstab",
+                    "cmd":"sed -i '/swap/d' /etc/fstab",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Ensure swap is disabled in the system",
+                    "cmd":"swapoff -a",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Upgrade all packages (except VMware Tools)",            
+                    "cmd":"/bin/yum upgrade --exclude=open-vm-tools -y > /tmp/ce-yum-upgrade.log",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Remove any pre-existing Docker Installation",            
+                    "cmd":"/bin/yum remove docker docker-common docker-selinux docker-engine",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Install Docker-CE Supporting tools",            
+                    "cmd":"/bin/yum install -y yum-utils device-mapper-persistent-data lvm2 -y > /tmp/ce-docker-deps.log",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Add Docker CE Repository",            
+                    "cmd":"/usr/bin/yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Enable Kubernetes Repository",            
+                    "cmd":"/usr/bin/echo -en '[kubernetes]\nname=Kubernetes\nbaseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64\nenabled=1\ngpgcheck=1\nrepo_gpgcheck=1\ngpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg\n    https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg' > /etc/yum.repos.d/kubernetes.repo",
+                    "sudoUser":"root"
+                },
+                {            
+                    "type":"execute",                    
+                    "note":"Update Yum Cache",            
+                    "cmd":"/bin/yum -y makecache fast",
+                    "args":""
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Installation of Docker 18.06 and Kubernetes",            
+                    "cmd":"/bin/yum -y install docker-ce-18.06.1.ce-3.el7 kubelet kubeadm kubectl > /tmp/kube-install.log",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Enable Docker on Boot",            
+                    "cmd":"/usr/bin/systemctl enable docker",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Enable Kubernetes on Boot",            
+                    "cmd":"/usr/bin/systemctl enable kubelet.service",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Start Docker to pre-configure system",            
+                    "cmd":"/usr/bin/systemctl start docker",
+                    "sudoUser":"root"
+                },                
+                {
+                    "type":"execute",                    
+                    "note":"Set Storage Driver to devicemapper",            
+                    "cmd":"/usr/bin/echo -en '{\n  \"storage-driver\": \"devicemapper\"\n}' > /etc/docker/daemon.json",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Restart Docker to pick up new storage/network Configuration",            
+                    "cmd":"/usr/bin/systemctl restart docker",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Configure Kubernetes to share same CGroup as Docker",            
+                    "cmd":"sed -i 's/cgroup-driver=systemd/cgroup-driver=cgroupfs/g' /etc/systemd/system/kubelet.service.d/10-kubeadm.conf",
+                    "sudoUser":"root"
+                }
+                ]
+            }            
+        }
+    ]
+}

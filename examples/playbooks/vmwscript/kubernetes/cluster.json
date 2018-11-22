@@ -1,0 +1,162 @@
+{{/* Runs the vmwscript playbook to provision a Kubernetes on vSphere */}}
+{{/* =% vmwscript %= */}}
+
+{{ flag "vcenter-url" "string" "VCenter URL" | prompt "VCenter URL?" "string" "https://username@vsphere.local:password@vc.unifydc.io/sdk" | var "input/url"}}
+{{ flag "data-center" "string" "Data Center name" | prompt "Data Center Name?" "string" "Datacenter" | var "input/dc"}}
+{{ flag "data-store" "string" "Data Store name" | prompt "Data Store Name?" "string" "datastore1" | var "input/ds"}}
+{{ flag "network-name" "string" "Network name" | prompt "Network Name?" "string" "Internal Network (NAT)" | var "input/nn"}}
+{{ flag "vsphere-host" "string" "VSphere host" | prompt "Host Name?" "string" "exsi01.unifydc.io" | var "input/host"}}
+
+{{ flag "user" "string" "Username" | prompt "User Name?" "string" | var "input/user"}}
+{{ flag "pass" "string" "Password" | prompt "Password?" "string" | var "input/password"}}
+{{ flag "stack" "string" "Stack name" | prompt "Stack?" "string" | var "input/stack"}}
+
+{
+    "label":"Kubernets-cluster-on-CentOS",
+    "version":"0.1",
+    "vmconfig" : {
+	    "vcenterURL" : "{{var `input/url`}}",
+	    "datacentre" : "{{var `input/dc`}}",
+	    "datastore":"{{var `input/ds`}}",
+	    "network" : "{{var `input/nn`}}",
+	    "host" : "{{var `input/host`}}",
+	    "guestCredentials" : {
+                "guestUser" : "{{var `input/user`}}",
+                "guestPass" : "{{var `input/password`}}"
+        }
+    },
+    "deployment": [
+        {"name": "K8s Manager",
+            "note": "Build Kubernetes manager",
+            "task":{
+               "inputTemplate": "KubeTemplate",
+               "outputName": "{{ var `input/stack` }}-manager001",
+               "outputType": "VM",
+               "import":"",
+               "networkConfig":{
+                    "distro":"centos",
+                    "device":"ens160",
+                    "address":"192.168.0.145/24",
+                    "gateway":"192.168.0.1",
+                    "dns":"192.168.0.15",
+                    "hostname":"k8manager001.local",
+                    "sudoUser":"root"
+                },
+               "commands": [
+                {
+                    "type":"execute",                    
+                    "note":"Disable SELINUX (FirewallD bug)",
+                    "cmd":"/usr/sbin/setenforce 0",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Configure iptables bridge",
+                    "cmd":"echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Set Kubernetes API server firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --add-port=6443/tcp --permanent",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Set Kubelet firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --add-port=10250/tcp --permanent",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Reload firewall rules",            
+                    "cmd":"/usr/bin/firewall-cmd --reload",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Deploy Master node",
+                    "cmd":"kubeadm init --apiserver-advertise-address=192.168.0.145 --pod-network-cidr=10.244.0.0/16 > /tmp/kubeadm.log",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Set kubectl configuration",
+                    "cmd":"mkdir -p $HOME/.kube; sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config; sudo chown $(id -u):$(id -g) $HOME/.kube/config",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Installation of Flannel Network",            
+                    "cmd":"kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"execute",                    
+                    "note":"Finding join token",            
+                    "cmd":"grep 'kubeadm join' /tmp/kubeadm.log > /tmp/kube.tkn",
+                    "sudoUser":"root"
+                },
+                {
+                    "type":"download",
+                    "filePath":"/tmp/kube.tkn",
+                    "resultKey":"jointoken",
+                    "delAfterDownload": false
+                }
+                ]
+            }
+        },
+        {"name": "Kubernetes Worker",
+            "note": "Add worker",
+            "task":{
+               "inputTemplate": "KubeTemplate",
+               "outputName": "{{ var `input/stack` }}-worker001",
+               "outputType": "VM",
+               "import":"",
+               "networkConfig":{
+                  "distro":"centos",
+                  "device":"ens160",
+                  "address":"192.168.0.146/24",
+                  "gateway":"192.168.0.1",
+                  "dns":"192.168.0.15",
+                  "hostname":"k8worker001.local",
+                  "sudoUser":"root"
+                },
+               "commands": [
+                   {
+                       "type":"execute",                    
+                       "note":"Join Kubeneretes Cluster",
+                       "execKey":"jointoken",
+                       "sudoUser":"root"
+                   }
+                ]
+            }
+        },
+        {"name": "Kubernetes Worker",
+            "note": "Add worker",
+            "task":{
+               "inputTemplate": "KubeTemplate",
+               "outputName": "{{ var `input/stack` }}-worker002",
+               "outputType": "VM",
+               "import":"",
+               "networkConfig":{
+                 "distro":"centos",
+                 "device":"ens160",
+                 "address":"192.168.0.147/24",
+                 "gateway":"192.168.0.1",
+                 "dns":"192.168.0.15",
+                 "hostname":"k8worker002.local",
+                 "sudoUser":"root"
+              },
+               "commands": [
+                   {
+                       "type":"execute",                    
+                       "note":"Join Kubeneretes Cluster",
+                       "execKey":"jointoken",
+                       "sudoUser":"root"
+                   }
+                ]
+            }
+        }
+    ]
+}

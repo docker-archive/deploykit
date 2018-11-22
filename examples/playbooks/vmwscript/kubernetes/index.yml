@@ -1,0 +1,11 @@
+# An index file.
+# This file is in YAML format.  All it does is to map command line verbs to
+# more templates which are executed as commands.
+
+# Build Kubernetes template
+build-template : Host-Template.json
+
+# Launch Kubernetes cluster
+#deploy-cluster : kubernetes.pb
+#
+deploy-cluster : cluster.json
